@@ -1,0 +1,30 @@
+{
+  "name": "pazaryeri-entegrasyon",
+  "version": "1.0.0",
+  "description": "Trendyol pazaryeri entegrasyon uygulaması",
+  "main": "index.js",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "npm run build:frontend",
+    "build:frontend": "echo 'Frontend build işlemi burada çalışacak'",
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "trendyol",
+    "ecommerce",
+    "integration"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.x.x",
+    "cors": "^2.8.5",
+    "dotenv": "^16.x.x",
+    "express": "^4.x.x",
+    "serverless-http": "^3.x.x"
+  },
+  "devDependencies": {
+    "netlify-cli": "^15.x.x"
+  }
+}

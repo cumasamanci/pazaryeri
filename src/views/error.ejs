@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hata - Trendyol Finans</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+  <style>
+    body {
+      background-color: #f8f9fa;
+    }
+    .error-container {
+      padding: 40px 0;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header partial yerine basit bir header ekliyoruz -->
+  <header class="bg-dark text-white py-3">
+    <div class="container">
+      <h1 class="h4 mb-0">Trendyol Finans</h1>
+    </div>
+  </header>
+
+  <div class="container-fluid mt-5">
+    <div class="row justify-content-center">
+      <div class="col-md-8">
+        <div class="card shadow-sm">
+          <div class="card-header bg-danger text-white">
+            <h5 class="mb-0">
+              <i class="bi bi-exclamation-triangle-fill me-2"></i> Hata
+            </h5>
+          </div>
+          <div class="card-body text-center py-5">
+            <div class="mb-4">
+              <i class="bi bi-emoji-frown" style="font-size: 4rem; color: #dc3545;"></i>
+            </div>
+            <h3 class="mb-4"><%= message %></h3>
+            <p class="text-muted">Hata Kodu: <%= error.status || 500 %></p>
+            
+            <% if (process.env.NODE_ENV === 'development' && error.stack) { %>
+            <div class="mt-4">
+              <div class="card">
+                <div class="card-header bg-light">
+                  <h6 class="mb-0">Hata Detayı (Geliştirme Modu)</h6>
+                </div>
+                <div class="card-body">
+                  <pre class="text-start text-muted"><%= error.stack %></pre>
+                </div>
+              </div>
+            </div>
+            <% } %>
+            
+            <div class="mt-4">
+              <a href="javascript:history.back()" class="btn btn-secondary me-2">
+                <i class="bi bi-arrow-left"></i> Geri Dön
+              </a>
+              <a href="/" class="btn btn-primary">
+                <i class="bi bi-house-fill"></i> Ana Sayfa
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

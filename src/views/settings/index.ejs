@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= locals.title || 'Ayarlar' %> - Trendyol Finans</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+</head>
+<body>
+  <%- include('../partials/navbar') %>
+  
+  <div class="container-fluid mt-4">
+    <div class="row mb-3">
+      <div class="col">
+        <h2>Ayarlar</h2>
+        <p class="text-muted">Trendyol mağazalarınızı ve uygulama ayarlarınızı yönetin</p>
+      </div>
+      <div class="col-auto">
+        <a href="/settings/store" class="btn btn-primary">
+          <i class="bi bi-plus-circle"></i> Yeni Mağaza Ekle
+        </a>
+        <a href="/settings/add-test-store" class="btn btn-success">
+          <i class="bi bi-plus-circle"></i> Test Mağaza Ekle
+        </a>
+        <a href="/settings/general" class="btn btn-outline-secondary">
+          <i class="bi bi-gear"></i> Genel Ayarlar
+        </a>
+      </div>
+    </div>
+
+    <% if (locals.message && locals.message !== '') { %>
+    <div class="alert alert-<%= locals.messageType === 'success' ? 'success' : 'danger' %> alert-dismissible fade show" role="alert">
+      <%= locals.message %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Kapat"></button>
+    </div>
+    <% } %>
+
+    <% if (locals.error && locals.error !== '') { %>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      <%= locals.error %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Kapat"></button>
+    </div>
+    <% } %>
+
+    <div class="card shadow-sm">
+      <div class="card-header">
+        <h5 class="mb-0">Trendyol Mağazaları</h5>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Mağaza Adı</th>
+                <th>Satıcı ID</th>
+                <th>API Anahtarı</th>
+                <th>Durumu</th>
+                <th>İşlemler</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% 
+              let hasStores = false;
+              if (locals.stores && Array.isArray(locals.stores) && locals.stores.length > 0) { 
+                hasStores = true;
+              %>
+                <% locals.stores.forEach(function(store, index) { %>
+                  <tr>
+                    <td><%= index + 1 %></td>
+                    <td><%= store.storeName %></td>
+                    <td><%= store.sellerId %></td>
+                    <td><%= store.apiKey ? store.apiKey.substring(0, 10) + '...' : 'Yok' %></td>
+                    <td>
+                      <% if (store.isActive) { %>
+                        <span class="badge bg-success">Aktif</span>
+                      <% } else { %>
+                        <span class="badge bg-secondary">Pasif</span>
+                      <% } %>
+                    </td>
+                    <td>
+                      <a href="/settings/store/<%= store.id %>" class="btn btn-sm btn-primary">
+                        <i class="bi bi-pencil"></i> Düzenle
+                      </a>
+                      <button type="button" class="btn btn-sm btn-danger delete-store" 
+                              data-id="<%= store.id %>" 
+                              data-name="<%= store.storeName %>">
+                        <i class="bi bi-trash"></i> Sil
+                      </button>
+                    </td>
+                  </tr>
+                <% }); %>
+              <% } else { %>
+                <tr>
+                  <td colspan="6" class="text-center">Henüz mağaza eklenmemiş.</td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mt-4">
+      <div class="card-header bg-light">Debug Bilgileri</div>
+      <div class="card-body">
+        <pre id="debugInfo" class="bg-light p-3">Yükleniyor...</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mağaza Silme Modalı -->
+  <div class="modal fade" id="deleteStoreModal" tabindex="-1" aria-labelledby="deleteStoreModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title" id="deleteStoreModalLabel">Mağaza Sil</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
+        </div>
+        <div class="modal-body">
+          <p><strong id="storeName"></strong> mağazasını silmek istediğinizden emin misiniz?</p>
+          <p class="text-danger">Bu işlem geri alınamaz!</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+          <a id="deleteStoreLink" href="#" class="btn btn-danger">Evet, Sil</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript dosyaları -->
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <script>
+    $(document).ready(function() {
+      try {
+        // Debug bilgilerini doldur
+        const storesCount = <%= locals.stores && Array.isArray(locals.stores) ? locals.stores.length : 0 %>;
+        const hasStores = <%= locals.stores && Array.isArray(locals.stores) && locals.stores.length > 0 ? 'true' : 'false' %>;
+        
+        const debugInfo = {
+          timestamp: new Date().toISOString(),
+          pageLoaded: true,
+          storesAvailable: storesCount,
+          hasStores: hasStores,
+          browserInfo: navigator.userAgent,
+          viewVersion: "2.1.0"
+        };
+        
+        $('#debugInfo').text(JSON.stringify(debugInfo, null, 2));
+      } catch (error) {
+        $('#debugInfo').text('Debug bilgileri yüklenirken hata oluştu: ' + error.message);
+      }
+      
+      // Silme modalı
+      $('.delete-store').on('click', function() {
+        try {
+          const id = $(this).data('id');
+          const name = $(this).data('name');
+          
+          $('#storeName').text(name || 'Seçili mağaza');
+          $('#deleteStoreLink').attr('href', `/settings/store/delete/${id}`);
+          
+          const deleteModal = document.getElementById('deleteStoreModal');
+          if (deleteModal) {
+            const modal = new bootstrap.Modal(deleteModal);
+            modal.show();
+          } else {
+            console.error('Silme modalı bulunamadı');
+          }
+        } catch (error) {
+          console.error('Modal açılırken hata:', error);
+          alert('İşlem sırasında bir hata oluştu.');
+        }
+      });
+      
+      // Otomatik kapanan uyarılar
+      window.setTimeout(function() {
+        $(".alert").fadeTo(500, 0).slideUp(500, function() {
+          $(this).remove();
+        });
+      }, 4000);
+    });
+  </script>
+</body>
+</html>

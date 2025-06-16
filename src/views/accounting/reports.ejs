@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Muhasebe Raporları - Trendyol Entegrasyonu</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+  <div class="container mt-4">
+    <div class="row mb-4">
+      <div class="col">
+        <h1>Muhasebe Raporları</h1>
+        <p class="text-muted">Trendyol muhasebe raporlarınız</p>
+      </div>
+      <div class="col-auto">
+        <a href="/" class="btn btn-secondary">Anasayfa</a>
+        <button id="generateReport" class="btn btn-primary">Yeni Rapor Oluştur</button>
+      </div>
+    </div>
+
+    <div class="row mb-4">
+      <div class="col-md-6 mb-3">
+        <div class="card">
+          <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Cari Hesap Ekstresi</h5>
+          </div>
+          <div class="card-body">
+            <p>Trendyol cari hesap ekstresini görüntüleyebilir ve analiz edebilirsiniz.</p>
+            <button id="viewCurrentAccount" class="btn btn-outline-primary">Cari Hesap Görüntüle</button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-6 mb-3">
+        <div class="card">
+          <div class="card-header bg-success text-white">
+            <h5 class="mb-0">Satış Raporları</h5>
+          </div>
+          <div class="card-body">
+            <p>Satış, iade ve indirim işlemlerinize ait raporları görüntüleyebilirsiniz.</p>
+            <button id="viewSalesReport" class="btn btn-outline-success">Satış Raporu Görüntüle</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center bg-primary text-white">
+        <h5 class="mb-0">Mevcut Raporlar</h5>
+        <div>
+          <button class="btn btn-sm btn-light" id="refreshReports">Yenile</button>
+          <button class="btn btn-sm btn-light" id="exportReportsCSV">CSV İndir</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-striped table-hover">
+            <thead>
+              <tr>
+                <th>Rapor ID</th>
+                <th>Rapor Adı</th>
+                <th>Oluşturma Tarihi</th>
+                <th>Durum</th>
+                <th>İşlemler</th>
+              </tr>
+            </thead>
+            <tbody id="reportsTableBody">
+              <% if (reports && reports.length > 0) { %>
+                <% reports.forEach(report => { %>
+                  <tr>
+                    <td><%= report.id %></td>
+                    <td><%= report.name %></td>
+                    <td><%= new Date(report.createdAt).toLocaleString('tr-TR') %></td>
+                    <td>
+                      <span class="badge <%= report.status === 'Tamamlandı' ? 'bg-success' : 'bg-warning' %>">
+                        <%= report.status || 'Hazır' %>
+                      </span>
+                    </td>
+                    <td>
+                      <button class="btn btn-sm btn-primary view-report" data-id="<%= report.id %>">Görüntüle</button>
+                      <button class="btn btn-sm btn-danger delete-report" data-id="<%= report.id %>">Sil</button>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr>
+                  <td colspan="5" class="text-center">Henüz oluşturulmuş rapor bulunmamaktadır</td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rapor Oluşturma Modal -->
+  <div class="modal fade" id="reportModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Yeni Rapor Oluştur</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+        </div>
+        <div class="modal-body">
+          <form id="reportForm">
+            <div class="mb-3">
+              <label for="reportName" class="form-label">Rapor Adı</label>
+              <input type="text" class="form-control" id="reportName" required>
+            </div>
+            <div class="mb-3">
+              <label for="reportType" class="form-label">Rapor Tipi</label>
+              <select class="form-select" id="reportType" required>
+                <option value="">Seçiniz</option>
+                <option value="currentAccount">Cari Hesap Ekstresi</option>
+                <option value="sales">Satış Raporu</option>
+                <option value="returns">İade Raporu</option>
+                <option value="finance">Finansal Rapor</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label for="reportStartDate" class="form-label">Başlangıç Tarihi</label>
+              <input type="date" class="form-control" id="reportStartDate" required>
+            </div>
+            <div class="mb-3">
+              <label for="reportEndDate" class="form-label">Bitiş Tarihi</label>
+              <input type="date" class="form-control" id="reportEndDate" required>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+          <button type="button" class="btn btn-primary" id="createReport">Oluştur</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rapor Görüntüleme Modal -->
+  <div class="modal fade" id="viewReportModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Rapor Detayları</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+        </div>
+        <div class="modal-body">
+          <div id="reportDetails">
+            <!-- Rapor detayları burada gösterilecek -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+          <button type="button" class="btn btn-primary" id="downloadReport">İndir</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Rapor oluşturma modalını açma
+      document.getElementById('generateReport').addEventListener('click', function() {
+        const reportModal = new bootstrap.Modal(document.getElementById('reportModal'));
+        reportModal.show();
+      });
+
+      // Cari hesap görüntüleme
+      document.getElementById('viewCurrentAccount').addEventListener('click', function() {
+        loadReportDetails({
+          id: 'current-account',
+          name: 'Cari Hesap Ekstresi',
+          type: 'currentAccount',
+          createdAt: new Date()
+        });
+        const viewReportModal = new bootstrap.Modal(document.getElementById('viewReportModal'));
+        viewReportModal.show();
+      });
+
+      // Satış raporu görüntüleme
+      document.getElementById('viewSalesReport').addEventListener('click', function() {
+        loadReportDetails({
+          id: 'sales-report',
+          name: 'Satış Raporu',
+          type: 'sales',
+          createdAt: new Date()
+        });
+        const viewReportModal = new bootstrap.Modal(document.getElementById('viewReportModal'));
+        viewReportModal.show();
+      });
+
+      // Rapor oluşturma
+      document.getElementById('createReport').addEventListener('click', function() {
+        const reportName = document.getElementById('reportName').value;
+        const reportType = document.getElementById('reportType').value;
+        const startDate = document.getElementById('reportStartDate').value;
+        const endDate = document.getElementById('reportEndDate').value;
+        
+        if (!reportName || !reportType || !startDate || !endDate) {
+          alert('Lütfen tüm alanları doldurun');
+          return;
+        }
+        
+        // Gerçek uygulamada API'ye istek yapılacak
+        alert('Rapor oluşturma isteği gönderildi: ' + reportName);
+        
+        const reportModal = bootstrap.Modal.getInstance(document.getElementById('reportModal'));
+        reportModal.hide();
+        
+        // Formları temizle
+        document.getElementById('reportForm').reset();
+      });
+
+      // Rapor görüntüleme butonları
+      document.querySelectorAll('.view-report').forEach(button => {
+        button.addEventListener('click', function() {
+          const reportId = this.getAttribute('data-id');
+          // Gerçek uygulamada API'den rapor detayları alınacak
+          loadReportDetails({
+            id: reportId,
+            name: 'Örnek Rapor',
+            type: 'sales',
+            createdAt: new Date()
+          });
+          
+          const viewReportModal = new bootstrap.Modal(document.getElementById('viewReportModal'));
+          viewReportModal.show();
+        });
+      });
+
+      // Rapor silme butonları
+      document.querySelectorAll('.delete-report').forEach(button => {
+        button.addEventListener('click', function() {
+          const reportId = this.getAttribute('data-id');
+          if (confirm('Bu raporu silmek istediğinizden emin misiniz?')) {
+            // Gerçek uygulamada API'ye silme isteği gönderilecek
+            alert('Rapor silme isteği gönderildi: ' + reportId);
+          }
+        });
+      });
+
+      // Rapor detaylarını yükleme
+      function loadReportDetails(report) {
+        const reportDetails = document.getElementById('reportDetails');
+        
+        // Örnek rapor içeriği
+        reportDetails.innerHTML = `
+          <div class="mb-3">
+            <h4>${report.name}</h4>
+            <p class="text-muted">Oluşturulma Tarihi: ${new Date(report.createdAt).toLocaleString('tr-TR')}</p>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>İşlem ID</th>
+                  <th>Tarih</th>
+                  <th>Açıklama</th>
+                  <th>Tutar</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>TR123456</td>
+                  <td>01.06.2023</td>
+                  <td>Satış</td>
+                  <td class="text-success">₺1,250.00</td>
+                </tr>
+                <tr>
+                  <td>TR123457</td>
+                  <td>02.06.2023</td>
+                  <td>İade</td>
+                  <td class="text-danger">-₺250.00</td>
+                </tr>
+                <tr>
+                  <td>TR123458</td>
+                  <td>03.06.2023</td>
+                  <td>Satış</td>
+                  <td class="text-success">₺875.50</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <th colspan="3" class="text-end">Toplam:</th>
+                  <th class="text-success">₺1,875.50</th>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        `;
+      }
+    });
+  </script>
+</body>
+</html>

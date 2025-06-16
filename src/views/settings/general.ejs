@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= locals.title || 'Genel Ayarlar' %> - Trendyol Finans</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+</head>
+<body>
+  <%- include('../partials/navbar') %>
+  
+  <div class="container-fluid mt-4">
+    <div class="row mb-3">
+      <div class="col">
+        <h2>Genel Ayarlar</h2>
+        <p class="text-muted">Uygulama genelindeki ayarları düzenleyin</p>
+      </div>
+      <div class="col-auto">
+        <a href="/settings" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-left"></i> Mağaza Ayarlarına Dön
+        </a>
+      </div>
+    </div>
+
+    <!-- Mesaj ve Hata Bildirimleri -->
+    <% if (locals.message && locals.message !== '') { %>
+    <div class="alert alert-<%= locals.messageType === 'success' ? 'success' : 'danger' %> alert-dismissible fade show" role="alert">
+      <%= locals.message %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Kapat"></button>
+    </div>
+    <% } %>
+
+    <% if (locals.error && locals.error !== '') { %>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      <%= locals.error %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Kapat"></button>
+    </div>
+    <% } %>
+
+    <div class="card shadow-sm">
+      <div class="card-header bg-light">
+        <h5 class="mb-0">Temel Ayarlar</h5>
+      </div>
+      <div class="card-body">
+        <form action="/settings/general" method="POST">
+          <div class="mb-3">
+            <label for="companyName" class="form-label">Şirket Adı</label>
+            <input type="text" class="form-control" id="companyName" name="companyName" 
+                  value="<%= locals.settings && locals.settings.companyName || '' %>">
+          </div>
+          
+          <div class="mb-3">
+            <label for="defaultCurrency" class="form-label">Varsayılan Para Birimi</label>
+            <select class="form-select" id="defaultCurrency" name="defaultCurrency">
+              <option value="TRY" <%= locals.settings && locals.settings.defaultCurrency === 'TRY' ? 'selected' : '' %>>Türk Lirası (₺)</option>
+              <option value="USD" <%= locals.settings && locals.settings.defaultCurrency === 'USD' ? 'selected' : '' %>>Amerikan Doları ($)</option>
+              <option value="EUR" <%= locals.settings && locals.settings.defaultCurrency === 'EUR' ? 'selected' : '' %>>Euro (€)</option>
+            </select>
+          </div>
+          
+          <hr class="my-4">
+          <h6>Bildirim Ayarları</h6>
+          
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="emailNotifications" name="emailNotifications"
+                  <%= locals.settings && locals.settings.emailNotifications === 'true' ? 'checked' : '' %>>
+            <label class="form-check-label" for="emailNotifications">E-posta Bildirimleri</label>
+            <div class="form-text">Önemli güncellemeler ve rapor bilgilendirmeleri için e-posta bildirimleri alın.</div>
+          </div>
+          
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="autoSync" name="autoSync"
+                  <%= locals.settings && locals.settings.autoSync === 'true' ? 'checked' : '' %>>
+            <label class="form-check-label" for="autoSync">Otomatik Senkronizasyon</label>
+            <div class="form-text">Her gün otomatik olarak Trendyol'dan güncel verileri çek.</div>
+          </div>
+          
+          <div class="text-end mt-4">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-save"></i> Ayarları Kaydet
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript dosyaları -->
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <script>
+    $(document).ready(function() {
+      // Otomatik kapanan uyarılar
+      window.setTimeout(function() {
+        $(".alert").fadeTo(500, 0).slideUp(500, function() {
+          $(this).remove();
+        });
+      }, 4000);
+    });
+  </script>
+</body>
+</html>

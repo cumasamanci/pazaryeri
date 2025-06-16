@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= locals.title || 'Ödeme Detayı' %> - Trendyol Finans</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+</head>
+<body>
+  <%- include('../partials/navbar') %>
+  
+  <div class="container-fluid mt-4">
+    <div class="row mb-3">
+      <div class="col">
+        <h2>Ödeme Detayı</h2>
+        <p class="text-muted">İşlem ID: <%= locals.payment.transactionId %></p>
+      </div>
+      <div class="col-auto">
+        <a href="/payments" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-left"></i> Ödeme Listesine Dön
+        </a>
+      </div>
+    </div>
+
+    <% if (locals.message && locals.message !== '') { %>
+    <div class="alert alert-<%= locals.messageType === 'success' ? 'success' : 'danger' %> alert-dismissible fade show" role="alert">
+      <%= locals.message %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Kapat"></button>
+    </div>
+    <% } %>
+
+    <% if (locals.error && locals.error !== '') { %>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      <%= locals.error %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Kapat"></button>
+    </div>
+    <% } %>
+
+    <div class="row">
+      <div class="col-md-8">
+        <div class="card shadow-sm mb-4">
+          <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">İşlem Bilgileri</h5>
+            <span class="badge <%= locals.payment.credit > 0 ? 'bg-success' : 'bg-danger' %>">
+              <%= locals.payment.credit > 0 ? 'ALACAK' : 'BORÇ' %>
+            </span>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <p class="fw-bold mb-1">İşlem Tipi</p>
+                <p><%= locals.payment.transactionType %></p>
+              </div>
+              <div class="col-md-6 mb-3">
+                <p class="fw-bold mb-1">İşlem Tarihi</p>
+                <p><%= locals.payment.transactionDate ? new Date(locals.payment.transactionDate).toLocaleString('tr-TR') : '-' %></p>
+              </div>
+              <div class="col-md-6 mb-3">
+                <p class="fw-bold mb-1">Mağaza</p>
+                <p><%= locals.payment.storeName || '-' %></p>
+              </div>
+              <div class="col-md-6 mb-3">
+                <p class="fw-bold mb-1">Dekont No</p>
+                <p><%= locals.payment.receiptId || '-' %></p>
+              </div>
+              <div class="col-md-6 mb-3">
+                <p class="fw-bold mb-1">Sipariş No</p>
+                <p><%= locals.payment.orderNumber || '-' %></p>
+              </div>
+              <div class="col-md-6 mb-3">
+                <p class="fw-bold mb-1">Barkod</p>
+                <p><%= locals.payment.barcode || '-' %></p>
+              </div>
+              <div class="col-md-6 mb-3">
+                <p class="fw-bold mb-1">Ödeme No</p>
+                <p><%= locals.payment.paymentOrderId || '-' %></p>
+              </div>
+              <div class="col-md-6 mb-3">
+                <p class="fw-bold mb-1">Ödeme Tarihi</p>
+                <p><%= locals.payment.paymentDate ? new Date(locals.payment.paymentDate).toLocaleDateString('tr-TR') : '-' %></p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <% if (locals.relatedPayments && Array.isArray(locals.relatedPayments) && locals.relatedPayments.length > 0) { %>
+        <div class="card shadow-sm">
+          <div class="card-header bg-light">
+            <h5 class="mb-0">İlişkili İşlemler</h5>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-striped">
+                <thead>
+                  <tr>
+                    <th>İşlem ID</th>
+                    <th>İşlem Tipi</th>
+                    <th>Borç</th>
+                    <th>Alacak</th>
+                    <th>Tarih</th>
+                    <th>İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% locals.relatedPayments.forEach(function(relatedPayment) { %>
+                    <tr>
+                      <td><%= relatedPayment.transactionId %></td>
+                      <td><%= relatedPayment.transactionType %></td>
+                      <td class="text-danger"><%= relatedPayment.debt > 0 ? relatedPayment.debt.toLocaleString('tr-TR', {minimumFractionDigits: 2}) + ' ₺' : '-' %></td>
+                      <td class="text-success"><%= relatedPayment.credit > 0 ? relatedPayment.credit.toLocaleString('tr-TR', {minimumFractionDigits: 2}) + ' ₺' : '-' %></td>
+                      <td><%= relatedPayment.transactionDate ? new Date(relatedPayment.transactionDate).toLocaleDateString('tr-TR') : '-' %></td>
+                      <td>
+                        <a href="/payments/<%= relatedPayment.id %>" class="btn btn-sm btn-primary">
+                          <i class="bi bi-eye"></i> Detay
+                        </a>
+                      </td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <% } %>
+      </div>
+      
+      <div class="col-md-4">
+        <div class="card shadow-sm mb-4">
+          <div class="card-header bg-light">
+            <h5 class="mb-0">Finansal Özet</h5>
+          </div>
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <span>Borç:</span>
+              <span class="fw-bold text-danger">
+                <%= locals.payment.debt ? locals.payment.debt.toLocaleString('tr-TR', {minimumFractionDigits: 2}) + ' ₺' : '0,00 ₺' %>
+              </span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <span>Alacak:</span>
+              <span class="fw-bold text-success">
+                <%= locals.payment.credit ? locals.payment.credit.toLocaleString('tr-TR', {minimumFractionDigits: 2}) + ' ₺' : '0,00 ₺' %>
+              </span>
+            </div>
+            <hr>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <span>Komisyon Oranı:</span>
+              <span class="fw-bold">
+                <%= locals.payment.commissionRate ? '%' + locals.payment.commissionRate.toLocaleString('tr-TR', {minimumFractionDigits: 2}) : '-' %>
+              </span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <span>Komisyon Tutarı:</span>
+              <span class="fw-bold text-danger">
+                <%= locals.payment.commissionAmount ? locals.payment.commissionAmount.toLocaleString('tr-TR', {minimumFractionDigits: 2}) + ' ₺' : '-' %>
+              </span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <span>Satıcı Geliri:</span>
+              <span class="fw-bold text-success">
+                <%= locals.payment.sellerRevenue ? locals.payment.sellerRevenue.toLocaleString('tr-TR', {minimumFractionDigits: 2}) + ' ₺' : '-' %>
+              </span>
+            </div>
+            <hr>
+            <div class="d-flex justify-content-between align-items-center">
+              <span>Vade Günü:</span>
+              <span class="fw-bold">
+                <%= locals.payment.paymentPeriod ? locals.payment.paymentPeriod + ' gün' : '-' %>
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="card shadow-sm">
+          <div class="card-header bg-light">
+            <h5 class="mb-0">API Bilgileri</h5>
+          </div>
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <span>API Tipi:</span>
+              <span class="fw-bold">
+                <%= locals.payment.apiType || '-' %>
+              </span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <span>Batch ID:</span>
+              <span class="fw-bold text-muted">
+                <%= locals.payment.batchId || '-' %>
+              </span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+              <span>Eklenme Tarihi:</span>
+              <span class="fw-bold">
+                <%= locals.payment.createdAt ? new Date(locals.payment.createdAt).toLocaleString('tr-TR') : '-' %>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript dosyaları -->
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <script>
+    $(document).ready(function() {
+      // Otomatik kapanan uyarılar
+      window.setTimeout(function() {
+        $(".alert").fadeTo(500, 0).slideUp(500, function() {
+          $(this).remove();
+        });
+      }, 4000);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!-- Mağaza düzenleme formu içinde, Submit butonunun yanına test butonu ekleyin -->
+<div class="modal-footer">
+  <button type="button" class="btn btn-success test-api-btn" data-store-id="<%= store.id %>">
+    <i class="bi bi-check-circle"></i> API Bağlantısını Test Et
+  </button>
+  <button type="submit" class="btn btn-primary">Kaydet</button>
+  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+</div>
+
+<!-- Mağaza düzenleme formunda, API key alanlarından sonra test butonu ekleyin -->
+<div class="row mb-3">
+  <label for="apiKey" class="col-sm-3 col-form-label">API Key</label>
+  <div class="col-sm-9">
+    <div class="input-group">
+      <input type="text" class="form-control" id="apiKey" name="apiKey" value="<%= store.apiKey || '' %>" required>
+      <button type="button" class="btn btn-outline-primary test-api-btn" data-store-id="<%= store.id %>">
+        <i class="bi bi-check-circle"></i> API Bağlantısını Test Et
+      </button>
+    </div>
+    <div class="form-text">Trendyol Seller Center'dan alınan API Key</div>
+  </div>
+</div>
+
+<!-- JavaScript kodunu ekleyin - sayfanın en altına -->
+<script>
+$(document).ready(function() {
+  // API Test butonu
+  $('.test-api-btn').on('click', function() {
+    const storeId = $(this).data('store-id');
+    const button = $(this);
+    
+    button.html('<i class="bi bi-arrow-repeat spin"></i> Test Ediliyor...');
+    button.prop('disabled', true);
+    
+    $.ajax({
+      url: '/settings/test-api',
+      type: 'POST',
+      data: { storeId: storeId },
+      dataType: 'json',
+      success: function(response) {
+        if (response.success) {
+          alert('Bağlantı başarılı! API yanıt verdi: ' + response.message);
+          button.removeClass('btn-outline-primary btn-outline-danger').addClass('btn-outline-success');
+        } else {
+          alert('Bağlantı başarısız: ' + response.message);
+          button.removeClass('btn-outline-primary btn-outline-success').addClass('btn-outline-danger');
+        }
+      },
+      error: function(xhr) {
+        let errorMsg = 'API test başarısız oldu';
+        if (xhr.responseJSON && xhr.responseJSON.message) {
+          errorMsg = xhr.responseJSON.message;
+        }
+        alert('Hata: ' + errorMsg);
+        button.removeClass('btn-outline-primary btn-outline-success').addClass('btn-outline-danger');
+      },
+      complete: function() {
+        button.html('<i class="bi bi-check-circle"></i> API Bağlantısını Test Et');
+        button.prop('disabled', false);
+      }
+    });
+  });
+});
+</script>

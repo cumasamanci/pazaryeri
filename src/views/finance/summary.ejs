@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finans Özeti - Trendyol Entegrasyonu</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+  <div class="container mt-4">
+    <div class="row mb-4">
+      <div class="col">
+        <h1>Finans Özeti</h1>
+        <p class="text-muted">Trendyol finansal işlemlerinizin özeti</p>
+      </div>
+      <div class="col-auto">
+        <a href="/" class="btn btn-secondary">Anasayfa</a>
+        <button id="refreshData" class="btn btn-primary">Verileri Yenile</button>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">Finansal İşlem Özeti</h5>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-4 mb-3">
+            <div class="card bg-success text-white">
+              <div class="card-body">
+                <h5 class="card-title">Toplam Satış</h5>
+                <h3 id="totalSales">₺0.00</h3>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4 mb-3">
+            <div class="card bg-danger text-white">
+              <div class="card-body">
+                <h5 class="card-title">Toplam İade</h5>
+                <h3 id="totalReturns">₺0.00</h3>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4 mb-3">
+            <div class="card bg-info text-white">
+              <div class="card-body">
+                <h5 class="card-title">Net Kazanç</h5>
+                <h3 id="netProfit">₺0.00</h3>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center bg-primary text-white">
+        <h5 class="mb-0">Finansal İşlemler</h5>
+        <div>
+          <button class="btn btn-sm btn-light" id="filterBtn">Filtrele</button>
+          <button class="btn btn-sm btn-light" id="exportCSV">CSV İndir</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-striped table-hover">
+            <thead>
+              <tr>
+                <th>İşlem ID</th>
+                <th>Tarih</th>
+                <th>İşlem Tipi</th>
+                <th>Açıklama</th>
+                <th>Tutar</th>
+                <th>Durum</th>
+              </tr>
+            </thead>
+            <tbody id="financeTableBody">
+              <% if (financeData && financeData.length > 0) { %>
+                <% financeData.forEach(item => { %>
+                  <tr>
+                    <td><%= item.id %></td>
+                    <td><%= new Date(item.transactionDate).toLocaleString('tr-TR') %></td>
+                    <td><%= item.transactionType %></td>
+                    <td><%= item.description %></td>
+                    <td class="<%= parseFloat(item.amount) >= 0 ? 'text-success' : 'text-danger' %>">
+                      ₺<%= parseFloat(item.amount).toFixed(2) %>
+                    </td>
+                    <td>
+                      <span class="badge <%= item.status === 'Tamamlandı' ? 'bg-success' : 'bg-warning' %>">
+                        <%= item.status || 'Beklemede' %>
+                      </span>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr>
+                  <td colspan="6" class="text-center">Finansal işlem kaydı bulunamadı</td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtre Modal -->
+  <div class="modal fade" id="filterModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Finansal İşlemleri Filtrele</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+        </div>
+        <div class="modal-body">
+          <form id="filterForm">
+            <div class="mb-3">
+              <label for="startDate" class="form-label">Başlangıç Tarihi</label>
+              <input type="date" class="form-control" id="startDate">
+            </div>
+            <div class="mb-3">
+              <label for="endDate" class="form-label">Bitiş Tarihi</label>
+              <input type="date" class="form-control" id="endDate">
+            </div>
+            <div class="mb-3">
+              <label for="transactionType" class="form-label">İşlem Tipi</label>
+              <select class="form-select" id="transactionType">
+                <option value="">Tümü</option>
+                <option value="Sale">Satış</option>
+                <option value="Return">İade</option>
+                <option value="Discount">İndirim</option>
+                <option value="Coupon">Kupon</option>
+              </select>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+          <button type="button" class="btn btn-primary" id="applyFilter">Uygula</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Filtreleme modalını açma
+      document.getElementById('filterBtn').addEventListener('click', function() {
+        const filterModal = new bootstrap.Modal(document.getElementById('filterModal'));
+        filterModal.show();
+      });
+
+      // Verileri yenileme
+      document.getElementById('refreshData').addEventListener('click', function() {
+        fetchFinanceData();
+      });
+
+      // Filtreleri uygulama
+      document.getElementById('applyFilter').addEventListener('click', function() {
+        const filterModal = bootstrap.Modal.getInstance(document.getElementById('filterModal'));
+        filterModal.hide();
+        fetchFinanceData({
+          startDate: document.getElementById('startDate').value,
+          endDate: document.getElementById('endDate').value,
+          transactionType: document.getElementById('transactionType').value
+        });
+      });
+
+      // CSV İndirme
+      document.getElementById('exportCSV').addEventListener('click', function() {
+        exportTableToCSV('finans_ozeti.csv');
+      });
+
+      // Finans verilerini getir
+      function fetchFinanceData(filters = {}) {
+        // Gerçek uygulamada API'den veri çekme
+        // Bu örnek için sabit veri kullanılıyor
+        updateFinanceSummary();
+      }
+
+      // Özet verilerini güncelle
+      function updateFinanceSummary() {
+        // Toplam satış, iade ve net kazanç hesaplamaları
+        // Gerçek uygulamada API'den alınan verilerle güncellenir
+        document.getElementById('totalSales').textContent = '₺15,780.45';
+        document.getElementById('totalReturns').textContent = '₺2,340.20';
+        document.getElementById('netProfit').textContent = '₺13,440.25';
+      }
+
+      // Tabloyu CSV olarak dışa aktarma
+      function exportTableToCSV(filename) {
+        const csv = [];
+        const rows = document.querySelectorAll('table tr');
+        
+        for (let i = 0; i < rows.length; i++) {
+          const row = [], cols = rows[i].querySelectorAll('td, th');
+          
+          for (let j = 0; j < cols.length; j++) {
+            row.push('"' + cols[j].innerText.replace(/"/g, '""') + '"');
+          }
+          
+          csv.push(row.join(','));
+        }
+        
+        // CSV dosyasını indirme
+        const csvFile = new Blob([csv.join('\n')], {type: 'text/csv'});
+        const downloadLink = document.createElement('a');
+        
+        downloadLink.download = filename;
+        downloadLink.href = window.URL.createObjectURL(csvFile);
+        downloadLink.style.display = 'none';
+        
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+      }
+
+      // İlk yükleme
+      fetchFinanceData();
+    });
+  </script>
+</body>
+</html>

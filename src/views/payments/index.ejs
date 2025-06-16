@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= locals.title || 'Ödemeler' %> - Trendyol Finans</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
+</head>
+<body>
+  <%- include('../partials/navbar') %>
+  
+  <div class="container-fluid mt-4">
+    <div class="row mb-3">
+      <div class="col">
+        <h2>Ödemeler</h2>
+        <p class="text-muted">Trendyol'dan ödeme ve finans verilerini çekin ve yönetin</p>
+      </div>
+      <div class="col-auto">
+        <button type="button" class="btn btn-success" id="exportExcel">
+          <i class="bi bi-file-earmark-excel"></i> Excel'e Aktar
+        </button>
+      </div>
+    </div>
+
+    <% if (locals.message && locals.message !== '') { %>
+    <div class="alert alert-<%= locals.messageType === 'success' ? 'success' : 'danger' %> alert-dismissible fade show" role="alert">
+      <%= locals.message %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Kapat"></button>
+    </div>
+    <% } %>
+
+    <% if (locals.error && locals.error !== '') { %>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      <%= locals.error %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Kapat"></button>
+    </div>
+    <% } %>
+
+    <!-- Replace the existing filter form with this structure -->
+<div class="card shadow-sm mb-4">
+  <div class="card-header bg-light">
+    <h5 class="mb-0">Veri Çekme Filtreleri</h5>
+  </div>
+  <div class="card-body">
+    <form id="paymentFilterForm" action="/payments/fetch" method="POST">
+      <div class="row mb-3">
+        <!-- Mağaza Seçimi -->
+        <div class="col-md-4 mb-3">
+          <label for="storeId" class="form-label">Mağaza</label>
+          <select class="form-select" id="storeId" name="storeId" required>
+            <option value="">Mağaza Seçiniz</option>
+            <% if (locals.stores && Array.isArray(locals.stores) && locals.stores.length > 0) { %>
+              <% locals.stores.forEach(function(store) { %>
+                <option value="<%= store.id %>" 
+                  <%= locals.selectedStore && locals.selectedStore == store.id ? 'selected' : '' %>>
+                  <%= store.storeName %>
+                </option>
+              <% }); %>
+            <% } %>
+          </select>
+        </div>
+        
+        <!-- Tarih Aralığı -->
+       <div class="mb-3">
+  <label for="dateRange" class="form-label">Tarih Aralığı</label>
+  <div class="input-group">
+    <span class="input-group-text">
+      <i class="bi bi-calendar3"></i>
+    </span>
+    <input type="text" class="form-control" id="dateRange" name="dateRange" placeholder="Tarih aralığı seçin" readonly>
+    <input type="hidden" id="startDate" name="startDate" />
+    <input type="hidden" id="endDate" name="endDate" />
+  </div>
+  <div class="form-text">
+    <i class="bi bi-info-circle"></i> Tarih aralığı en fazla 15 gün olabilir
+  </div>
+</div>
+      </div>
+      
+      <!-- API Tipi Seçimi -->
+      <div class="row mb-3">
+        <div class="col-12">
+          <label class="form-label">API Tipi</label>
+          <div class="d-flex gap-4">
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="apiType" id="apiTypeSettlements" value="settlements" checked>
+              <label class="form-check-label" for="apiTypeSettlements">
+                Settlements (Satış, İade, İndirim, Kupon)
+              </label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="apiType" id="apiTypeOtherFinancials" value="otherfinancials">
+              <label class="form-check-label" for="apiTypeOtherFinancials">
+                Other Financials (Ödemeler, Finansman, Faturalar)
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Settlements İşlem Tipleri -->
+      <div id="settlementTransactions" class="transaction-type-container mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <label class="form-label">Settlements İşlem Tipleri</label>
+          <div>
+            <button type="button" class="btn btn-sm btn-outline-primary select-all-btn" data-target="settlements">
+              <i class="bi bi-check-all"></i> Tümünü Seç
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary clear-all-btn" data-target="settlements">
+              <i class="bi bi-x-lg"></i> Tümünü Kaldır
+            </button>
+          </div>
+        </div>
+        
+        <div class="row">
+          <div class="col-md-3 mb-2">
+            <div class="form-check">
+              <input class="form-check-input settlement-checkbox" type="checkbox" name="transactionType" value="Sale" id="typeSale">
+              <label class="form-check-label" for="typeSale">
+                Satış (Sale)
+              </label>
+            </div>
+          </div>
+          <div class="col-md-3 mb-2">
+            <div class="form-check">
+              <input class="form-check-input settlement-checkbox" type="checkbox" name="transactionType" value="Return" id="typeReturn">
+              <label class="form-check-label" for="typeReturn">
+                İade (Return)
+              </label>
+            </div>
+          </div>
+          <div class="col-md-3 mb-2">
+            <div class="form-check">
+              <input class="form-check-input settlement-checkbox" type="checkbox" name="transactionType" value="Discount" id="typeDiscount">
+              <label class="form-check-label" for="typeDiscount">
+                İndirim (Discount)
+              </label>
+            </div>
+          </div>
+          <div class="col-md-3 mb-2">
+            <div class="form-check">
+              <input class="form-check-input settlement-checkbox" type="checkbox" name="transactionType" value="DiscountCancel" id="typeDiscountCancel">
+              <label class="form-check-label" for="typeDiscountCancel">
+                İndirim İptal (DiscountCancel)
+              </label>
+            </div>
+          </div>
+          <div class="col-md-3 mb-2">
+            <div class="form-check">
+              <input class="form-check-input settlement-checkbox" type="checkbox" name="transactionType" value="Coupon" id="typeCoupon">
+              <label class="form-check-label" for="typeCoupon">
+                Kupon (Coupon)
+              </label>
+            </div>
+          </div>
+          <div class="col-md-3 mb-2">
+            <div class="form-check">
+              <input class="form-check-input settlement-checkbox" type="checkbox" name="transactionType" value="CouponCancel" id="typeCouponCancel">
+              <label class="form-check-label" for="typeCouponCancel">
+                Kupon İptal (CouponCancel)
+              </label>
+            </div>
+          </div>
+          <div class="col-md-3 mb-2">
+            <div class="form-check">
+              <input class="form-check-input settlement-checkbox" type="checkbox" name="transactionType" value="ProvisionPositive" id="typeProvisionPositive">
+              <label class="form-check-label" for="typeProvisionPositive">
+                Provizyon + (ProvisionPositive)
+              </label>
+            </div>
+          </div>
+          <div class="col-md-3 mb-2">
+            <div class="form-check">
+              <input class="form-check-input settlement-checkbox" type="checkbox" name="transactionType" value="ProvisionNegative" id="typeProvisionNegative">
+              <label class="form-check-label" for="typeProvisionNegative">
+                Provizyon - (ProvisionNegative)
+              </label>
+            </div>
+          </div>
+          <div class="col-md-3 mb-2">
+            <div class="form-check">
+              <input class="form-check-input settlement-checkbox" type="checkbox" name="transactionType" value="ManualRefund" id="typeManualRefund">
+              <label class="form-check-label" for="typeManualRefund">
+                Kısmi İade (ManualRefund)
+              </label>
+            </div>
+          </div>
+          <div class="col-md-3 mb-2">
+            <div class="form-check">
+              <input class="form-check-input settlement-checkbox" type="checkbox" name="transactionType" value="ManualRefundCancel" id="typeManualRefundCancel">
+              <label class="form-check-label" for="typeManualRefundCancel">
+                Kısmi İade İptal (ManualRefundCancel)
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Other Financials İşlem Tipleri -->
+      <div id="financialTransactions" class="transaction-type-container mb-3" style="display: none;">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <label class="form-label">Other Financials İşlem Tipleri</label>
+          <div>
+            <button type="button" class="btn btn-sm btn-outline-primary select-all-btn" data-target="financials">
+              <i class="bi bi-check-all"></i> Tümünü Seç
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary clear-all-btn" data-target="financials">
+              <i class="bi bi-x-lg"></i> Tümünü Kaldır
+            </button>
+          </div>
+        </div>
+        
+        <div class="row">
+          <div class="col-md-3 mb-2">
+            <div class="form-check">
+              <input class="form-check-input financial-checkbox" type="checkbox" name="transactionType" value="PaymentOrder" id="typePaymentOrder">
+              <label class="form-check-label" for="typePaymentOrder">
+                Ödeme (PaymentOrder)
+              </label>
+            </div>
+          </div>
+          <div class="col-md-3 mb-2">
+            <div class="form-check">
+              <input class="form-check-input financial-checkbox" type="checkbox" name="transactionType" value="CashAdvance" id="typeCashAdvance">
+              <label class="form-check-label" for="typeCashAdvance">
+                Tedarikçi Finansmanı (CashAdvance)
+              </label>
+            </div>
+          </div>
+          <div class="col-md-3 mb-2">
+            <div class="form-check">
+              <input class="form-check-input financial-checkbox" type="checkbox" name="transactionType" value="WireTransfer" id="typeWireTransfer">
+              <label class="form-check-label" for="typeWireTransfer">
+                Virman (WireTransfer)
+              </label>
+            </div>
+          </div>
+          <div class="col-md-3 mb-2">
+            <div class="form-check">
+              <input class="form-check-input financial-checkbox" type="checkbox" name="transactionType" value="IncomingTransfer" id="typeIncomingTransfer">
+              <label class="form-check-label" for="typeIncomingTransfer">
+                Gelen Havale (IncomingTransfer)
+              </label>
+            </div>
+          </div>
+          <div class="col-md-3 mb-2">
+            <div class="form-check">
+              <input class="form-check-input financial-checkbox" type="checkbox" name="transactionType" value="ReturnInvoice" id="typeReturnInvoice">
+              <label class="form-check-label" for="typeReturnInvoice">
+                İade Faturası (ReturnInvoice)
+              </label>
+            </div>
+          </div>
+          <div class="col-md-3 mb-2">
+            <div class="form-check">
+              <input class="form-check-input financial-checkbox" type="checkbox" name="transactionType" value="DeductionInvoices" id="typeDeductionInvoices">
+              <label class="form-check-label" for="typeDeductionInvoices">
+                Kesinti Faturası (DeductionInvoices)
+              </label>
+            </div>
+          </div>
+          <div class="col-md-3 mb-2">
+            <div class="form-check">
+              <input class="form-check-input financial-checkbox" type="checkbox" name="transactionType" value="Stoppage" id="typeStoppage">
+              <label class="form-check-label" for="typeStoppage">
+                Stopaj (Stoppage)
+              </label>
+            </div>
+          </div>
+          <div class="col-md-3 mb-2">
+            <div class="form-check">
+              <input class="form-check-input financial-checkbox" type="checkbox" name="transactionType" value="CommissionAgreementInvoice" id="typeCommissionAgreementInvoice">
+              <label class="form-check-label" for="typeCommissionAgreementInvoice">
+                Komisyon Mutabakat Faturası
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- İşlem Butonları -->
+      <div class="d-flex mt-3">
+        <button type="submit" class="btn btn-primary me-2">
+          <i class="bi bi-cloud-download"></i> Veri Çek
+        </button>
+        <button type="button" class="btn btn-outline-secondary" id="filterBtn">
+          <i class="bi bi-funnel"></i> Mevcut Verileri Filtrele
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+    <div class="card shadow-sm">
+      <div class="card-header bg-light">
+        <h5 class="mb-0">Ödeme Listesi</h5>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-striped" id="paymentsTable">
+            <thead>
+              <tr>
+                <th>İşlem ID</th>
+                <th>Mağaza</th>
+                <th>İşlem Tipi</th>
+                <th>Sipariş No</th>
+                <th>Barkod</th>
+                <th>Borç</th>
+                <th>Alacak</th>
+                <th>Komisyon</th>
+                <th>Tarih</th>
+                <th>Ödeme No</th>
+                <th>İşlemler</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% 
+              let hasPayments = false;
+              if (locals.payments && Array.isArray(locals.payments) && locals.payments.length > 0) { 
+                hasPayments = true;
+              %>
+                <% locals.payments.forEach(function(payment) { %>
+                  <tr>
+                    <td><%= payment.id %></td>
+                    <td><%= payment.storeName || 'Bilinmiyor' %></td>
+                    <td><%= payment.transactionType %></td>
+                    <td><%= payment.orderNumber || '-' %></td>
+                    <td><%= payment.barcode || '-' %></td>
+                    <td class="text-danger"><%= payment.debt > 0 ? payment.debt.toLocaleString('tr-TR', {minimumFractionDigits: 2}) + ' ₺' : '-' %></td>
+                    <td class="text-success"><%= payment.credit > 0 ? payment.credit.toLocaleString('tr-TR', {minimumFractionDigits: 2}) + ' ₺' : '-' %></td>
+                    <td><%= payment.commissionAmount ? payment.commissionAmount.toLocaleString('tr-TR', {minimumFractionDigits: 2}) + ' ₺' : '-' %></td>
+                    <td><%= payment.transactionDate ? new Date(payment.transactionDate).toLocaleDateString('tr-TR') : '-' %></td>
+                    <td><%= payment.paymentOrderId || '-' %></td>
+                    <td>
+                      <a href="/payments/<%= payment.id %>" class="btn btn-sm btn-primary">
+                        <i class="bi bi-eye"></i> Detay
+                      </a>
+                    </td>
+                  </tr>
+                <% }); %>
+              <% } else { %>
+                <tr>
+                  <td colspan="11" class="text-center">Kayıtlı ödeme işlemi bulunamadı. Veri çekmek için filtreleri kullanabilirsiniz.</td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    
+    <% if (locals.fetchStats) { %>
+    <div class="card mt-3">
+      <div class="card-header bg-light">
+        <h5 class="mb-0">Veri Çekme İstatistikleri</h5>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-3">
+            <div class="card bg-success text-white mb-3">
+              <div class="card-body">
+                <h5 class="card-title">Toplam Kayıt</h5>
+                <p class="card-text display-6"><%= locals.fetchStats.totalRecords %></p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card bg-primary text-white mb-3">
+              <div class="card-body">
+                <h5 class="card-title">Eklenen</h5>
+                <p class="card-text display-6"><%= locals.fetchStats.addedRecords %></p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card bg-warning text-dark mb-3">
+              <div class="card-body">
+                <h5 class="card-title">Atlanan</h5>
+                <p class="card-text display-6"><%= locals.fetchStats.skippedRecords %></p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card bg-info text-white mb-3">
+              <div class="card-body">
+                <h5 class="card-title">İşlem Süresi</h5>
+                <p class="card-text display-6"><%= locals.fetchStats.processingTime %> sn</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- JavaScript dosyaları -->
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/tr.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver/dist/FileSaver.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/moment/min/moment.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+  
+  <!-- JavaScript kodunu payments/index.ejs dosyasındaki <script> tagı içine ekleyin -->
+  <script>
+$(document).ready(function() {
+  // Flatpickr tarih seçici
+  $(".datepicker").flatpickr({
+    locale: "tr",
+    dateFormat: "d.m.Y",
+    allowInput: true,
+    maxDate: new Date()
+  });
+  
+  // API tipi değiştiğinde ilgili işlem tiplerini göster
+  $('input[name="apiType"]').on("change", function() {
+    $('.transaction-type-container').hide();
+    if ($(this).val() === "settlements") {
+      $('#settlementTransactions').show();
+    } else if ($(this).val() === "otherfinancials") {
+      $('#financialTransactions').show();
+    }
+  });
+  
+  // Tümünü seç butonu
+  $('.select-all-btn').on("click", function() {
+    const target = $(this).data('target');
+    if (target === 'settlements') {
+      $('.settlement-checkbox').prop('checked', true);
+    } else if (target === 'financials') {
+      $('.financial-checkbox').prop('checked', true);
+    }
+  });
+  
+  // Tümünü kaldır butonu  
+  $('.clear-all-btn').on("click", function() {
+    const target = $(this).data('target');
+    if (target === 'settlements') {
+      $('.settlement-checkbox').prop('checked', false);
+    } else if (target === 'financials') {
+      $('.financial-checkbox').prop('checked', false);
+    }
+  });
+  
+  // Form gönderilmeden önce kontrol
+  $('#paymentFilterForm').on('submit', function(e) {
+    // En az bir işlem tipi seçilmiş mi kontrol et
+    const apiType = $('input[name="apiType"]:checked').val();
+    let checkedCount = 0;
+    
+    if (apiType === 'settlements') {
+      checkedCount = $('.settlement-checkbox:checked').length;
+    } else if (apiType === 'otherfinancials') {
+      checkedCount = $('.financial-checkbox:checked').length;
+    }
+    
+    if (checkedCount === 0) {
+      e.preventDefault();
+      alert('En az bir işlem tipi seçmelisiniz!');
+      return false;
+    }
+    
+    // Tarih aralığı kontrolü
+    const startDate = $('#startDate').val();
+    const endDate = $('#endDate').val();
+    
+    if (startDate && endDate) {
+      const start = new Date(startDate.split('.').reverse().join('-'));
+      const end = new Date(endDate.split('.').reverse().join('-'));
+      const diffTime = Math.abs(end - start);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays > 15) {
+        e.preventDefault();
+        alert('Tarih aralığı en fazla 15 gün olabilir!');
+        return false;
+      }
+    }
+    
+    // Mağaza seçilmiş mi?
+    if (!$('#storeId').val()) {
+      e.preventDefault();
+      alert('Lütfen mağaza seçiniz!');
+      return false;
+    }
+    
+    return true;
+  });
+  
+  // Filtre butonu
+  $('#filterBtn').on('click', function() {
+    $('#paymentFilterForm').attr('action', '/payments/filter');
+    $('#paymentFilterForm').submit();
+  });
+});
+</script>
+
+  <!-- JavaScript kodu - <script> tagı içine veya ayrı bir dosyaya eklenebilir -->
+  <script>
+    $(document).ready(function() {
+      // API tipi seçildiğinde ilgili işlem tiplerini göster
+      $('input[name="apiType"]').on("change", function() {
+        const apiType = $(this).val();
+        
+        if (apiType === "settlements") {
+          $('#settlementTransactions').show();
+          $('#financialTransactions').hide();
+        } else if (apiType === "otherfinancials") {
+          $('#settlementTransactions').hide();
+          $('#financialTransactions').show();
+        }
+      });
+      
+      // Tümünü Seç butonu
+      $('.select-all-btn').on("click", function() {
+        const target = $(this).data('target');
+        if (target === 'settlement') {
+          $('.settlement-checkbox').prop('checked', true);
+        } else if (target === 'financial') {
+          $('.financial-checkbox').prop('checked', true);
+        }
+      });
+      
+      // Tümünü Kaldır butonu
+      $('.clear-all-btn').on("click", function() {
+        const target = $(this).data('target');
+        if (target === 'settlement') {
+          $('.settlement-checkbox').prop('checked', false);
+        } else if (target === 'financial') {
+          $('.financial-checkbox').prop('checked', false);
+        }
+      });
+      
+      // Form gönderme kontrolü - en az bir işlem tipi seçilmeli
+      $('#paymentFilterForm').on('submit', function(e) {
+        let apiType = $('input[name="apiType"]:checked').val();
+        let checkedCount = 0;
+        
+        if (apiType === 'settlements') {
+          checkedCount = $('.settlement-checkbox:checked').length;
+        } else if (apiType === 'otherfinancials') {
+          checkedCount = $('.financial-checkbox:checked').length;
+        }
+        
+        if (checkedCount === 0) {
+          e.preventDefault();
+          alert('En az bir işlem tipi seçmelisiniz!');
+        }
+      });
+    });
+  </script>
+
+  <!-- Add this script just before the closing </body> tag -->
+  <script>
+$(document).ready(function() {
+  // API tipi değiştiğinde ilgili işlem tiplerini göster
+  $('input[name="apiType"]').on("change", function() {
+    $('.transaction-type-container').hide();
+    if ($(this).val() === "settlements") {
+      $('#settlementTransactions').show();
+    } else if ($(this).val() === "otherfinancials") {
+      $('#financialTransactions').show();
+    }
+  });
+  
+  // Tümünü seç butonu
+  $('.select-all-btn').on("click", function() {
+    const target = $(this).data('target');
+    if (target === 'settlements') {
+      $('.settlement-checkbox').prop('checked', true);
+    } else if (target === 'financials') {
+      $('.financial-checkbox').prop('checked', true);
+    }
+  });
+  
+  // Tümünü kaldır butonu  
+  $('.clear-all-btn').on("click", function() {
+    const target = $(this).data('target');
+    if (target === 'settlements') {
+      $('.settlement-checkbox').prop('checked', false);
+    } else if (target === 'financials') {
+      $('.financial-checkbox').prop('checked', false);
+    }
+  });
+  
+  // Form gönderilmeden önce kontrol
+  $('#paymentFilterForm').on('submit', function(e) {
+    // En az bir işlem tipi seçilmiş mi kontrol et
+    const apiType = $('input[name="apiType"]:checked').val();
+    let checkedCount = 0;
+    
+    if (apiType === 'settlements') {
+      checkedCount = $('.settlement-checkbox:checked').length;
+    } else if (apiType === 'otherfinancials') {
+      checkedCount = $('.financial-checkbox:checked').length;
+    }
+    
+    if (checkedCount === 0) {
+      e.preventDefault();
+      alert('En az bir işlem tipi seçmelisiniz!');
+      return false;
+    }
+    
+    // Tarih aralığı kontrolü
+    const startDate = $('#startDate').val();
+    const endDate = $('#endDate').val();
+    
+    if (startDate && endDate) {
+      const start = new Date(startDate.split('.').reverse().join('-'));
+      const end = new Date(endDate.split('.').reverse().join('-'));
+      const diffTime = Math.abs(end - start);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays > 15) {
+        e.preventDefault();
+        alert('Tarih aralığı en fazla 15 gün olabilir!');
+        return false;
+      }
+    }
+    
+    // Mağaza seçilmiş mi?
+    if (!$('#storeId').val()) {
+      e.preventDefault();
+      alert('Lütfen mağaza seçiniz!');
+      return false;
+    }
+    
+    return true;
+  });
+  
+  // Filtre butonu
+  $('#filterBtn').on('click', function() {
+    $('#paymentFilterForm').attr('action', '/payments/filter');
+    $('#paymentFilterForm').submit();
+  });
+});
+</script>
+
+<!-- Sayfanın en altına script tagları arasına ekleyin -->
+<script>
+$(document).ready(function() {
+  // DateRangePicker başlangıç tarihi için geçerli tarihten 7 gün öncesi
+  const defaultStart = moment().subtract(7, 'days');
+  const defaultEnd = moment();
+  
+  // DateRangePicker'ı initialize et
+  $('#dateRange').daterangepicker({
+    locale: {
+      format: 'DD.MM.YYYY',
+      separator: ' - ',
+      applyLabel: 'Uygula',
+      cancelLabel: 'İptal',
+      fromLabel: 'Başlangıç',
+      toLabel: 'Bitiş',
+      customRangeLabel: 'Özel',
+      weekLabel: 'H',
+      daysOfWeek: ['Pz', 'Pt', 'Sa', 'Çr', 'Pr', 'Cu', 'Ct'],
+      monthNames: ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 
+                  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'],
+      firstDay: 1
+    },
+    startDate: defaultStart,
+    endDate: defaultEnd,
+    maxDate: moment(),
+    ranges: {
+      'Bugün': [moment(), moment()],
+      'Dün': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+      'Son 7 Gün': [moment().subtract(6, 'days'), moment()],
+      'Son 15 Gün': [moment().subtract(14, 'days'), moment()],
+      'Bu Ay': [moment().startOf('month'), moment().endOf('month')]
+    },
+    opens: 'left',
+    autoApply: true
+  }, function(start, end) {
+    // Tarih seçildiğinde gizli alanlara değerleri ata
+    $('#startDate').val(start.format('DD.MM.YYYY'));
+    $('#endDate').val(end.format('DD.MM.YYYY'));
+  });
+  
+  // Varsayılan değerleri gizli alanlara ata
+  $('#startDate').val(defaultStart.format('DD.MM.YYYY'));
+  $('#endDate').val(defaultEnd.format('DD.MM.YYYY'));
+  
+  // Form submit işlemi öncesi kontroller
+  $('#paymentFilterForm').on('submit', function(e) {
+    const startDate = $('#startDate').val();
+    const endDate = $('#endDate').val();
+    
+    if (!startDate || !endDate) {
+      alert('Lütfen tarih aralığı seçiniz');
+      e.preventDefault();
+      return false;
+    }
+    
+    // Tarih aralığı kontrolü (15 günden fazla olamaz)
+    const start = moment(startDate, 'DD.MM.YYYY');
+    const end = moment(endDate, 'DD.MM.YYYY');
+    const dayDiff = end.diff(start, 'days');
+    
+    if (dayDiff > 15) {
+      alert('Tarih aralığı en fazla 15 gün olabilir.');
+      e.preventDefault();
+      return false;
+    }
+  });
+});
+</script>
+</body>
+</html>
