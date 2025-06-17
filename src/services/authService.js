@@ -1,23 +1,55 @@
 const { supabase } = require('../config/database');
 
+/**
+ * Supabase Auth kullanarak kimlik doğrulama servisi
+ */
 const AuthService = {
-  // Kullanıcı girişi
+  /**
+   * Kullanıcı girişi
+   * @param {string} email - Kullanıcı e-posta adresi
+   * @param {string} password - Kullanıcı şifresi
+   * @returns {Promise} - Oturum bilgileri
+   */
   login: async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    
-    if (error) throw error;
-    return data;
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) throw error;
+      
+      // Kullanıcı profilini getir
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', data.user.id)
+        .single();
+      
+      return {
+        ...data,
+        profile
+      };
+    } catch (error) {
+      console.error('Giriş yapılırken hata:', error.message);
+      throw error;
+    }
   },
   
-  // Kullanıcı kaydı
+  /**
+   * Kullanıcı kaydı
+   * @param {string} email - Kullanıcı e-posta adresi
+   * @param {string} password - Kullanıcı şifresi
+   * @param {Object} userData - Kullanıcı profil bilgileri
+   * @returns {Promise} - Kayıt sonucu
+   */
   register: async (email, password, userData = {}) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
+    try {
+      // Kullanıcıyı kaydet
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
         data: userData
       }
     });

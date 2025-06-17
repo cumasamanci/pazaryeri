@@ -1,0 +1,6 @@
+# Redirect non-www to www
+https://jpg.com.tr/* https://www.jpg.com.tr/:splat 301!
+
+# SPA redirects
+/api/* /.netlify/functions/api/:splat 200
+/* /index.html 200

@@ -696,18 +696,17 @@ $(document).ready(function() {
     if (!startDate || !endDate) {
       alert('Lütfen tarih aralığı seçiniz');
       e.preventDefault();
-      return false;
-    }
+      return false;    }
     
-    // Tarih aralığı kontrolü (15 günden fazla olamaz)
+    // Tarih aralığı kontrolü - Sistem artık otomatik parçalama yapıyor
     const start = moment(startDate, 'DD.MM.YYYY');
     const end = moment(endDate, 'DD.MM.YYYY');
     const dayDiff = end.diff(start, 'days');
     
     if (dayDiff > 15) {
-      alert('Tarih aralığı en fazla 15 gün olabilir.');
-      e.preventDefault();
-      return false;
+      // Artık 15 günlük sınır yok, sistem otomatik parçalara bölerek işliyor
+      console.log(`Tarih aralığı ${dayDiff} gün. Sistem otomatik olarak parçalara bölerek işleyecek.`);
+      // alert kaldırıldı, işlem devam ediyor
     }
   });
 });

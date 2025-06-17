@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Supabase Auth Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        button { margin: 5px; padding: 10px; }
+        input { margin: 5px; padding: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Supabase Authentication Test</h1>
+    
+    <div class="test-section">
+        <h3>1. Bağlantı Testi</h3>
+        <button onclick="testConnection()">Bağlantıyı Test Et</button>
+        <div id="connectionResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>2. Kayıt Testi (Email Confirmation Gerektirmez)</h3>
+        <input type="email" id="regEmail" placeholder="E-posta" value="test@example.com">
+        <input type="password" id="regPassword" placeholder="Şifre" value="test123456">
+        <button onclick="testRegisterNoConfirm()">Kayıt Ol (Onaysız)</button>
+        <div id="registerResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>3. Giriş Testi</h3>
+        <input type="email" id="loginEmail" placeholder="E-posta" value="test@example.com">
+        <input type="password" id="loginPassword" placeholder="Şifre" value="test123456">
+        <button onclick="testLogin()">Giriş Yap</button>
+        <div id="loginResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>4. Mevcut Session</h3>
+        <button onclick="checkSession()">Session Kontrol Et</button>
+        <button onclick="logout()">Çıkış Yap</button>
+        <div id="sessionResult"></div>
+    </div>
+
+    <script>
+        const supabaseUrl = 'https://kbbpoywbqrmucjrrefcq.supabase.co';
+        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtiYnBveXdicXJtdWNqcnJlZmNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAwNTUzNDMsImV4cCI6MjA2NTYzMTM0M30.fN9-h7ouV6YJir_hAEauGA97tLH3m78svw86ET4OGZE';
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+        async function testConnection() {
+            try {
+                const { data, error } = await supabase.from('stores').select('count');
+                document.getElementById('connectionResult').innerHTML = `
+                    <p class="success">✓ Bağlantı başarılı!</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                document.getElementById('connectionResult').innerHTML = `
+                    <p class="error">✗ Bağlantı hatası: ${error.message}</p>
+                `;
+            }
+        }
+
+        async function testRegisterNoConfirm() {
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            
+            try {
+                // Önce kullanıcı var mı kontrol et
+                const { data: existingUser } = await supabase.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+
+                if (existingUser.session) {
+                    document.getElementById('registerResult').innerHTML = `
+                        <p class="info">Bu kullanıcı zaten mevcut ve giriş yapabilir!</p>
+                        <pre>${JSON.stringify(existingUser.user, null, 2)}</pre>
+                    `;
+                    return;
+                }
+            } catch (e) {
+                // Kullanıcı yok, kayıt yapmaya devam et
+            }
+
+            try {
+                const { data, error } = await supabase.auth.signUp({
+                    email: email,
+                    password: password,
+                    options: {
+                        emailRedirectTo: undefined, // Email confirmation devre dışı
+                    }
+                });
+                
+                if (error) {
+                    document.getElementById('registerResult').innerHTML = `
+                        <p class="error">✗ Kayıt hatası: ${error.message}</p>
+                    `;
+                } else {
+                    document.getElementById('registerResult').innerHTML = `
+                        <p class="success">✓ Kayıt başarılı!</p>
+                        <p class="info">User ID: ${data.user?.id}</p>
+                        <p class="info">Email: ${data.user?.email}</p>
+                        <p class="info">Email Confirmed: ${data.user?.email_confirmed_at ? 'Evet' : 'Hayır'}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('registerResult').innerHTML = `
+                    <p class="error">✗ Kayıt hatası: ${error.message}</p>
+                `;
+            }
+        }
+
+        async function testLogin() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+                
+                if (error) {
+                    document.getElementById('loginResult').innerHTML = `
+                        <p class="error">✗ Giriş hatası: ${error.message}</p>
+                    `;
+                } else {
+                    document.getElementById('loginResult').innerHTML = `
+                        <p class="success">✓ Giriş başarılı!</p>
+                        <p class="info">User ID: ${data.user?.id}</p>
+                        <p class="info">Email: ${data.user?.email}</p>
+                        <p class="info">Email Confirmed: ${data.user?.email_confirmed_at ? 'Evet' : 'Hayır'}</p>
+                        <pre>${JSON.stringify(data.session, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('loginResult').innerHTML = `
+                    <p class="error">✗ Giriş hatası: ${error.message}</p>
+                `;
+            }
+        }
+
+        async function checkSession() {
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                
+                if (error) {
+                    document.getElementById('sessionResult').innerHTML = `
+                        <p class="error">✗ Session hatası: ${error.message}</p>
+                    `;
+                } else if (session) {
+                    document.getElementById('sessionResult').innerHTML = `
+                        <p class="success">✓ Aktif session var!</p>
+                        <p class="info">User ID: ${session.user?.id}</p>
+                        <p class="info">Email: ${session.user?.email}</p>
+                        <p class="info">Email Confirmed: ${session.user?.email_confirmed_at ? 'Evet' : 'Hayır'}</p>
+                        <pre>${JSON.stringify(session.user, null, 2)}</pre>
+                    `;
+                } else {
+                    document.getElementById('sessionResult').innerHTML = `
+                        <p class="info">Aktif session yok.</p>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('sessionResult').innerHTML = `
+                    <p class="error">✗ Session kontrol hatası: ${error.message}</p>
+                `;
+            }
+        }
+
+        async function logout() {
+            try {
+                const { error } = await supabase.auth.signOut();
+                
+                if (error) {
+                    document.getElementById('sessionResult').innerHTML = `
+                        <p class="error">✗ Çıkış hatası: ${error.message}</p>
+                    `;
+                } else {
+                    document.getElementById('sessionResult').innerHTML = `
+                        <p class="success">✓ Başarıyla çıkış yapıldı!</p>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('sessionResult').innerHTML = `
+                    <p class="error">✗ Çıkış hatası: ${error.message}</p>
+                `;
+            }
+        }
+
+        // Sayfa yüklendiğinde session kontrol et
+        window.onload = function() {
+            checkSession();
+        };
+    </script>
+</body>
+</html>

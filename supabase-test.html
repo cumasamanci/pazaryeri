@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Supabase Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Supabase Bağlantı Testi</h1>
+    <button onclick="testConnection()">Bağlantıyı Test Et</button>
+    <button onclick="testRegister()">Kayıt Testi</button>
+    <div id="result"></div>
+
+    <script>
+        const supabaseUrl = 'https://kbbpoywbqrmucjrrefcq.supabase.co';
+        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtiYnBveXdicXJtdWNqcnJlZmNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAwNTUzNDMsImV4cCI6MjA2NTYzMTM0M30.fN9-h7ouV6YJir_hAEauGA97tLH3m78svw86ET4OGZE';
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+        async function testConnection() {
+            try {
+                const { data, error } = await supabase.from('stores').select('count');
+                document.getElementById('result').innerHTML = `
+                    <h3>Bağlantı Başarılı!</h3>
+                    <p>Stores tablosu erişilebilir</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                document.getElementById('result').innerHTML = `
+                    <h3>Bağlantı Hatası!</h3>
+                    <p style="color: red;">${error.message}</p>
+                `;
+            }
+        }
+
+        async function testRegister() {
+            try {
+                const { data, error } = await supabase.auth.signUp({
+                    email: 'test@example.com',
+                    password: 'test123456'
+                });
+                
+                document.getElementById('result').innerHTML = `
+                    <h3>Kayıt Testi Sonucu:</h3>
+                    <p>Data: ${JSON.stringify(data, null, 2)}</p>
+                    <p>Error: ${error ? error.message : 'Yok'}</p>
+                `;
+            } catch (error) {
+                document.getElementById('result').innerHTML = `
+                    <h3>Kayıt Testi Hatası!</h3>
+                    <p style="color: red;">${error.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

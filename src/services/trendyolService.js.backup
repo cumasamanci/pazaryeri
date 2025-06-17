@@ -1,0 +1,445 @@
+const axios = require('axios');
+const crypto = require('crypto');
+
+class TrendyolService {
+  constructor() {
+    // Test için stage environment kullan
+    this.baseUrl = process.env.NODE_ENV === 'production'
+      ? 'https://stageapigw.trendyol.com/integration/finance'  // Test için stage kullan
+      : 'https://stageapigw.trendyol.com/integration/finance';
+      
+    console.log('TrendyolService initialized with baseUrl:', this.baseUrl);
+  }
+
+  // API için temel kimlik doğrulama başlıklarını oluştur
+  getAuthHeaders(apiKey, apiSecret) {
+    const credentials = `${apiKey}:${apiSecret}`;
+    const base64Credentials = Buffer.from(credentials).toString('base64');
+    
+    console.log('Auth credentials oluşturuluyor:', {
+      apiKey: apiKey ? apiKey.substring(0, 8) + '...' : 'MISSING',
+      apiSecret: apiSecret ? apiSecret.substring(0, 8) + '...' : 'MISSING',
+      credentials: credentials.substring(0, 20) + '...',
+      base64: base64Credentials.substring(0, 20) + '...'
+    });
+    
+    return {
+      'Authorization': 'Basic ' + base64Credentials,
+      'User-Agent': 'Pazaryeri-Finance-Integration',
+      'Content-Type': 'application/json'
+    };
+  }
+
+  /**
+   * Settlements verilerini getir (Satış, İade, İndirim, Kupon, Provizyon)
+   * @param {Object} params - API parametreleri
+   * @returns {Promise<Object>} API response
+   */
+  async getSettlements(params) {
+    try {
+      console.log('=== TRENDYOL SETTLEMENTS API BAŞLADI ===');
+      
+      const { sellerId, apiKey, apiSecret, startDate, endDate, transactionTypes, page = 0, size = 500 } = params;
+      
+      console.log('API Parametreleri:', {
+        sellerId,
+        hasApiKey: !!apiKey,
+        hasApiSecret: !!apiSecret,
+        startDate,
+        endDate,
+        transactionTypes,
+        page,
+        size
+      });
+      
+      if (!sellerId || !apiKey || !apiSecret || !startDate || !endDate || !transactionTypes) {
+        const error = 'Eksik parametreler: sellerId, apiKey, apiSecret, startDate, endDate, transactionTypes gerekli';
+        console.error('Parametre hatası:', error);
+        throw new Error(error);
+      }
+      
+      const headers = this.getAuthHeaders(apiKey, apiSecret);
+      console.log('Auth headers oluşturuldu');
+      
+      const results = [];
+      
+      // Her transaction type için ayrı API çağrısı yap
+      for (const transactionType of transactionTypes) {
+        try {
+          console.log(`=== ${transactionType} İÇİN API ÇAĞRISI ===`);
+          console.log('API URL:', `${this.baseUrl}/che/sellers/${sellerId}/settlements`);
+          console.log('API Parametreleri:', {
+            sellerId,
+            startDate,
+            endDate,
+            transactionType,
+            page,
+            size
+          });
+
+          const response = await axios.get(
+            `${this.baseUrl}/che/sellers/${sellerId}/settlements`,
+            {
+              headers,
+              params: {
+                startDate,
+                endDate,
+                transactionType,
+                page,
+                size
+              },
+              timeout: 30000
+            }
+          );
+
+          console.log(`${transactionType} API Response:`, {
+            status: response.status,
+            hasData: !!response.data,
+            hasContent: !!(response.data && response.data.content),
+            contentLength: response.data && response.data.content ? response.data.content.length : 0,
+            totalElements: response.data ? response.data.totalElements : 0
+          });
+
+          if (response.data && response.data.content) {
+            results.push({
+              transactionType,
+              success: true,
+              data: response.data.content,
+              totalElements: response.data.totalElements,
+              totalPages: response.data.totalPages,
+              page: response.data.page,
+              size: response.data.size
+            });
+            console.log(`${transactionType} başarılı: ${response.data.content.length} kayıt`);
+          } else {
+            results.push({
+              transactionType,
+              success: false,
+              error: 'Veri bulunamadı',
+              data: []
+            });
+            console.log(`${transactionType} veri bulunamadı`);
+          }
+        } catch (error) {
+          console.error(`=== ${transactionType} API HATASI ===`);
+          console.error('HTTP Status:', error.response ? error.response.status : 'No response');
+          console.error('Error Message:', error.message);
+          console.error('Response Data:', error.response ? error.response.data : 'No response data');
+          
+          results.push({
+            transactionType,
+            success: false,
+            error: error.message,
+            data: [],
+            httpStatus: error.response ? error.response.status : null,
+            responseData: error.response ? error.response.data : null
+          });
+        }
+      }
+
+      const finalResult = {
+        success: true,
+        results,
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log('=== SETTLEMENTS API SONUCU ===');
+      console.log('Results count:', results.length);
+      console.log('Success results:', results.filter(r => r.success).length);
+      console.log('Failed results:', results.filter(r => !r.success).length);
+      
+      return finalResult;
+    } catch (error) {
+      console.error('=== SETTLEMENTS API GENEL HATASI ===');
+      console.error('Error:', error);
+      console.error('Stack:', error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Other Financials verilerini getir (Tedarikçi finansmanı, virman, ödemeler, faturalar)
+   * @param {Object} params - API parametreleri
+   * @returns {Promise<Object>} API response
+   */
+  async getOtherFinancials(params) {
+    try {
+      console.log('=== TRENDYOL OTHER FINANCIALS API BAŞLADI ===');
+      
+      const { sellerId, apiKey, apiSecret, startDate, endDate, transactionTypes, page = 0, size = 500 } = params;
+      
+      console.log('API Parametreleri:', {
+        sellerId,
+        hasApiKey: !!apiKey,
+        hasApiSecret: !!apiSecret,
+        startDate,
+        endDate,
+        transactionTypes,
+        page,
+        size
+      });
+      
+      if (!sellerId || !apiKey || !apiSecret || !startDate || !endDate || !transactionTypes) {
+        const error = 'Eksik parametreler: sellerId, apiKey, apiSecret, startDate, endDate, transactionTypes gerekli';
+        console.error('Parametre hatası:', error);
+        throw new Error(error);
+      }
+      
+      const headers = this.getAuthHeaders(apiKey, apiSecret);
+      console.log('Auth headers oluşturuldu');
+      
+      const results = [];
+      
+      // Her transaction type için ayrı API çağrısı yap
+      for (const transactionType of transactionTypes) {
+        try {
+          console.log(`=== ${transactionType} İÇİN API ÇAĞRISI ===`);
+          console.log('API URL:', `${this.baseUrl}/che/sellers/${sellerId}/otherfinancials`);
+          console.log('API Parametreleri:', {
+            sellerId,
+            startDate,
+            endDate,
+            transactionType,
+            page,
+            size
+          });
+
+          const response = await axios.get(
+            `${this.baseUrl}/che/sellers/${sellerId}/otherfinancials`,
+            {
+              headers,
+              params: {
+                startDate,
+                endDate,
+                transactionType,
+                page,
+                size
+              },
+              timeout: 30000
+            }
+          );
+
+          console.log(`${transactionType} API Response:`, {
+            status: response.status,
+            hasData: !!response.data,
+            hasContent: !!(response.data && response.data.content),
+            contentLength: response.data && response.data.content ? response.data.content.length : 0,
+            totalElements: response.data ? response.data.totalElements : 0
+          });
+
+          if (response.data && response.data.content) {
+            results.push({
+              transactionType,
+              success: true,
+              data: response.data.content,
+              totalElements: response.data.totalElements,
+              totalPages: response.data.totalPages,
+              page: response.data.page,
+              size: response.data.size
+            });
+            console.log(`${transactionType} başarılı: ${response.data.content.length} kayıt`);
+          } else {
+            results.push({
+              transactionType,
+              success: false,
+              error: 'Veri bulunamadı',
+              data: []
+            });
+            console.log(`${transactionType} veri bulunamadı`);
+          }
+        } catch (error) {
+          console.error(`=== ${transactionType} API HATASI ===`);
+          console.error('HTTP Status:', error.response ? error.response.status : 'No response');
+          console.error('Error Message:', error.message);
+          console.error('Response Data:', error.response ? error.response.data : 'No response data');
+          
+          results.push({
+            transactionType,
+            success: false,
+            error: error.message,
+            data: [],
+            httpStatus: error.response ? error.response.status : null,
+            responseData: error.response ? error.response.data : null
+          });
+        }
+      }
+
+      const finalResult = {
+        success: true,
+        results,
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log('=== OTHER FINANCIALS API SONUCU ===');
+      console.log('Results count:', results.length);
+      console.log('Success results:', results.filter(r => r.success).length);
+      console.log('Failed results:', results.filter(r => !r.success).length);
+      
+      return finalResult;
+    } catch (error) {
+      console.error('=== OTHER FINANCIALS API GENEL HATASI ===');
+      console.error('Error:', error);
+      console.error('Stack:', error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * API bağlantısını test et
+   * @param {Object} credentials - API kimlik bilgileri
+   * @returns {Promise<Object>} Test sonucu
+   */
+  async testConnection(credentials) {
+    try {
+      const { sellerId, apiKey, apiSecret } = credentials;
+      
+      if (!sellerId || !apiKey || !apiSecret) {
+        throw new Error('API kimlik bilgileri eksik');
+      }
+
+      // Son 1 gün için Sale transaction'ı test et
+      const endDate = new Date().getTime();
+      const startDate = endDate - (24 * 60 * 60 * 1000); // 1 gün önce
+
+      const testParams = {
+        sellerId,
+        apiKey,
+        apiSecret,
+        startDate,
+        endDate,
+        transactionTypes: ['Sale'],
+        page: 0,
+        size: 1
+      };
+
+      const result = await this.getSettlements(testParams);
+      
+      return {
+        success: true,
+        message: 'API bağlantısı başarılı',
+        timestamp: new Date().toISOString(),
+        testResult: result
+      };
+    } catch (error) {
+      console.error('API test hatası:', error);
+      return {
+        success: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * Tarih aralığını 15 günlük parçalara böl
+   * @param {Date} startDate - Başlangıç tarihi
+   * @param {Date} endDate - Bitiş tarihi
+   * @returns {Array} Tarih parçaları
+   */
+  splitDateRange(startDate, endDate) {
+    console.log('=== TARİH ARALIGI PARÇALAMA ===');
+    console.log('Başlangıç tarihi:', startDate);
+    console.log('Bitiş tarihi:', endDate);
+    
+    const periods = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    const totalDays = Math.ceil((end - start) / (24 * 60 * 60 * 1000));
+    console.log('Toplam gün sayısı:', totalDays);
+    
+    while (start < end) {
+      const periodEnd = new Date(start);
+      periodEnd.setDate(periodEnd.getDate() + 14); // 15 gün ekle
+      
+      if (periodEnd > end) {
+        periodEnd.setTime(end.getTime());
+      }
+      
+      periods.push({
+        startDate: start.getTime(),
+        endDate: periodEnd.getTime(),
+        startDateStr: start.toISOString().split('T')[0],
+        endDateStr: periodEnd.toISOString().split('T')[0]
+      });
+      
+      start.setDate(start.getDate() + 15);
+    }
+    
+    console.log(`Tarih aralığı ${periods.length} parçaya bölündü:`, periods);
+    return periods;
+  }
+
+  /**
+   * Trendyol API'nin desteklediği Settlement transaction türleri
+   */
+  getSettlementTransactionTypes() {
+    return [
+      'Sale',
+      'Return',
+      'Discount',
+      'DiscountCancel',
+      'Coupon',
+      'CouponCancel',
+      'ProvisionPositive',
+      'ProvisionNegative',
+      'ManualRefund',
+      'ManualRefundCancel',
+      'TYDiscount',
+      'TYDiscountCancel',
+      'TYCoupon',
+      'TYCouponCancel'
+    ];
+  }
+
+  /**
+   * Trendyol API'nin desteklediği Other Financials transaction türleri
+   */
+  getOtherFinancialsTransactionTypes() {
+    return [
+      'Stoppage',
+      'CashAdvance',
+      'WireTransfer',
+      'IncomingTransfer',
+      'ReturnInvoice',
+      'CommissionAgreementInvoice',
+      'PaymentOrder',
+      'DeductionInvoices'
+    ];
+  }
+
+  /**
+   * Transaction type açıklamalarını getir
+   */
+  getTransactionTypeDescriptions() {
+    return {
+      // Settlement transaction types
+      'Sale': 'Siparişlere ait satış kayıtları',
+      'Return': 'Siparişlere ait iade kayıtları',
+      'Discount': 'Tedarikçi tarafından karşılanan indirim tutarı',
+      'DiscountCancel': 'İndirim kaydının iptali',
+      'Coupon': 'Tedarikçi tarafından karşılanan kupon tutarı',
+      'CouponCancel': 'Kupon kaydının iptali',
+      'ProvisionPositive': 'Gramaj farkından dolayı oluşan pozitif provizyon',
+      'ProvisionNegative': 'Gramaj farkından dolayı oluşan negatif provizyon',
+      'ManualRefund': 'Kısmi iade kayıtları',
+      'ManualRefundCancel': 'Kısmi iade kaydının iptali',
+      'TYDiscount': 'Kurumsal faturalı alışverişlerde Trendyol indirimleri',
+      'TYDiscountCancel': 'Trendyol indirim kaydının iptali',
+      'TYCoupon': 'Kurumsal faturalı alışverişlerde Trendyol kuponları',
+      'TYCouponCancel': 'Trendyol kupon kaydının iptali',
+      
+      // Other Financials transaction types
+      'Stoppage': 'E-ticaret Stopajı kayıtları',
+      'CashAdvance': 'Vadesi gelmemiş hakedişler için erken ödeme',
+      'WireTransfer': 'Trendyol ile Tedarikçi arasında yapılan virman',
+      'IncomingTransfer': 'Tedarikçiden Trendyola yapılan ödemeler',
+      'ReturnInvoice': 'Tedarikçiden Trendyola kesilen iade faturaları',
+      'CommissionAgreementInvoice': 'Komisyon mutabakat faturaları',
+      'PaymentOrder': 'Tedarikçiye yapılan hakediş ödemesi',
+      'DeductionInvoices': 'Trendyol tarafından kesilen hizmet faturaları'
+    };
+  }
+}
+
+module.exports = TrendyolService;

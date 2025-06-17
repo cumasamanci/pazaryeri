@@ -1,0 +1,8 @@
+{
+  "storeId": 8,
+  "apiType": "settlements",
+  "transactionTypes": ["Sale", "Return"],
+  "startDate": 1748736000000,
+  "endDate": 1749686400000,
+  "jobName": "Test Automation"
+}

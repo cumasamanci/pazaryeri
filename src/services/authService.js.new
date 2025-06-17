@@ -1,0 +1,178 @@
+const { supabase } = require('../config/database');
+
+/**
+ * Supabase Auth kullanarak kimlik doğrulama servisi
+ */
+const AuthService = {
+  /**
+   * Kullanıcı girişi
+   * @param {string} email - Kullanıcı e-posta adresi
+   * @param {string} password - Kullanıcı şifresi
+   * @returns {Promise} - Oturum bilgileri
+   */
+  login: async (email, password) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) throw error;
+      
+      // Kullanıcı profilini getir
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', data.user.id)
+        .single();
+      
+      return {
+        ...data,
+        profile
+      };
+    } catch (error) {
+      console.error('Giriş yapılırken hata:', error.message);
+      throw error;
+    }
+  },
+  
+  /**
+   * Kullanıcı kaydı
+   * @param {string} email - Kullanıcı e-posta adresi
+   * @param {string} password - Kullanıcı şifresi
+   * @param {Object} userData - Kullanıcı profil bilgileri
+   * @returns {Promise} - Kayıt sonucu
+   */
+  register: async (email, password, userData = {}) => {
+    try {
+      // Kullanıcıyı kaydet
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: userData
+        }
+      });
+      
+      if (authError) throw authError;
+      
+      // Profil verilerini oluştur
+      if (authData.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([{
+            user_id: authData.user.id,
+            name: userData.name || '',
+            avatar_url: userData.avatar_url || '',
+            created_at: new Date(),
+            updated_at: new Date()
+          }]);
+        
+        if (profileError) throw profileError;
+      }
+      
+      return authData;
+    } catch (error) {
+      console.error('Kayıt olurken hata:', error.message);
+      throw error;
+    }
+  },
+  
+  /**
+   * Kullanıcı çıkışı
+   * @returns {Promise} - İşlem sonucu
+   */
+  logout: async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Çıkış yapılırken hata:', error.message);
+      throw error;
+    }
+  },
+  
+  /**
+   * Mevcut kullanıcıyı getir
+   * @returns {Promise} - Kullanıcı bilgileri
+   */
+  getCurrentUser: async () => {
+    try {
+      const { data, error } = await supabase.auth.getUser();
+      
+      if (error) throw error;
+      
+      if (data?.user) {
+        // Kullanıcı profilini getir
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', data.user.id)
+          .single();
+        
+        return {
+          user: data.user,
+          profile
+        };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Kullanıcı bilgisi alınırken hata:', error.message);
+      throw error;
+    }
+  },
+  
+  /**
+   * Oturum bilgilerini getir
+   * @returns {Promise} - Oturum bilgileri
+   */
+  getSession: async () => {
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      return data?.session || null;
+    } catch (error) {
+      console.error('Oturum bilgisi alınırken hata:', error.message);
+      throw error;
+    }
+  },
+  
+  /**
+   * Şifre sıfırlama e-postası gönder
+   * @param {string} email - Kullanıcı e-posta adresi
+   * @returns {Promise} - İşlem sonucu
+   */
+  resetPassword: async (email) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('Şifre sıfırlama e-postası gönderilirken hata:', error.message);
+      throw error;
+    }
+  },
+  
+  /**
+   * Şifre güncelleme
+   * @param {string} newPassword - Yeni şifre
+   * @returns {Promise} - İşlem sonucu
+   */
+  updatePassword: async (newPassword) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+      
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('Şifre güncellenirken hata:', error.message);
+      throw error;
+    }
+  }
+};
+
+module.exports = AuthService;

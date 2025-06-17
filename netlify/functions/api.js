@@ -3,6 +3,16 @@ const serverless = require('serverless-http');
 const app = express();
 const cors = require('cors');
 
+// Environment variables'ları yükle - Netlify Functions için
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
+
+console.log('Environment check in Netlify Function:');
+console.log('SUPABASE_URL:', process.env.SUPABASE_URL ? 'EXISTS' : 'MISSING');
+console.log('SUPABASE_ANON_KEY:', process.env.SUPABASE_ANON_KEY ? 'EXISTS' : 'MISSING');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
