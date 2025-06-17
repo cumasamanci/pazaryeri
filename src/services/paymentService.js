@@ -61,14 +61,17 @@ class PaymentService {
         console.error('Mağaza bulunamadı, storeId:', storeId);
         throw new Error('Mağaza bulunamadı');
       }
-      
-      console.log('Mağaza bulundu:', { 
+        console.log('Mağaza bulundu:', { 
         id: store.id, 
         name: store.name, 
         seller_id: store.seller_id,
         hasApiKey: !!store.api_key,
-        hasApiSecret: !!store.api_secret
-      });      // Tarih aralığını 15 günlük parçalara böl
+        hasApiSecret: !!store.api_secret,
+        apiKeyLength: store.api_key ? store.api_key.length : 0,
+        apiSecretLength: store.api_secret ? store.api_secret.length : 0,
+        apiKeyPreview: store.api_key ? store.api_key.substring(0, 8) + '...' : 'YOK',
+        apiSecretPreview: store.api_secret ? store.api_secret.substring(0, 8) + '...' : 'YOK'
+      });// Tarih aralığını 15 günlük parçalara böl
       const periods = this.trendyolService.splitDateRange(startDateObj, endDateObj);
       console.log('Tarih aralığı parçalara bölündü:', periods.length, 'dönem');
 

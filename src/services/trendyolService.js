@@ -91,15 +91,26 @@ class TrendyolService {  constructor() {
    * Settlement verilerini çek
    */
   async fetchSettlements(apiKey, apiSecret, sellerId, startDate, endDate, page = 0, size = 200) {
-    try {
-      console.log('=== SETTLEMENT VERİLERİ ÇEKİLİYOR ===');
+    try {      console.log('=== SETTLEMENT VERİLERİ ÇEKİLİYOR ===');
       console.log('Parametreler:', {
         sellerId,
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         page,
-        size
+        size,
+        apiKey: apiKey ? apiKey.substring(0, 8) + '...' : 'YOK',
+        apiSecret: apiSecret ? apiSecret.substring(0, 8) + '...' : 'YOK',        apiKeyLength: apiKey ? apiKey.length : 0,
+        apiSecretLength: apiSecret ? apiSecret.length : 0
       });
+
+      // API key validasyonu
+      if (!apiKey || !apiSecret) {
+        console.error('API Key/Secret eksik!', {
+          hasApiKey: !!apiKey,
+          hasApiSecret: !!apiSecret
+        });
+        throw new Error('Invalid API key - API key veya secret eksik');
+      }
 
       const config = this.getRequestConfig(apiKey, apiSecret);
       

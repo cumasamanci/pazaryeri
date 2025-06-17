@@ -11,6 +11,8 @@ if (process.env.NODE_ENV !== 'production') {
 console.log('Environment check in Netlify Function:');
 console.log('SUPABASE_URL:', process.env.SUPABASE_URL ? 'EXISTS' : 'MISSING');
 console.log('SUPABASE_ANON_KEY:', process.env.SUPABASE_ANON_KEY ? 'EXISTS' : 'MISSING');
+console.log('TRENDYOL_API_KEY:', process.env.TRENDYOL_API_KEY ? 'EXISTS' : 'MISSING');
+console.log('TRENDYOL_API_SECRET:', process.env.TRENDYOL_API_SECRET ? 'EXISTS' : 'MISSING');
 console.log('NODE_ENV:', process.env.NODE_ENV);
 
 // Middleware
