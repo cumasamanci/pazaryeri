@@ -155,15 +155,13 @@ class PaymentService {
             startDate: apiParams.startDate,
             endDate: apiParams.endDate,
             transactionTypes: apiParams.transactionTypes
-          });
-
-          let result;
+          });          let result;
           if (apiType === 'settlements') {
             console.log('Settlements API çağrısı yapılıyor...');
-            result = await this.trendyolService.getSettlements(apiParams);
+            result = await this.processSettlements(apiParams);
           } else if (apiType === 'otherfinancials') {
             console.log('Other Financials API çağrısı yapılıyor...');
-            result = await this.trendyolService.getOtherFinancials(apiParams);
+            result = await this.processOtherFinancials(apiParams);
           } else {
             throw new Error('Geçersiz API tipi: ' + apiType);
           }
@@ -434,7 +432,198 @@ class PaymentService {
   }
 
   /**
-   * Yardımcı fonksiyon: Sleep
+   * Settlement verilerini işle
+   */
+  async processSettlements(apiParams) {
+    try {
+      console.log('=== SETTLEMENT VERİLERİ İŞLENİYOR ===');
+      
+      const { sellerId, apiKey, apiSecret, startDate, endDate, transactionTypes } = apiParams;
+      
+      // TrendyolService'den settlement verilerini çek
+      const apiData = await this.trendyolService.fetchSettlements(
+        apiKey, 
+        apiSecret, 
+        sellerId, 
+        startDate, 
+        endDate
+      );
+      
+      console.log('Settlement API yanıtı:', {
+        totalElements: apiData?.totalElements || 0,
+        contentLength: apiData?.content?.length || 0
+      });
+      
+      // Verileri settlement formatına dönüştür
+      const results = [];
+      
+      if (apiData && apiData.content && apiData.content.length > 0) {
+        // Settlement verilerini transaction type'larına göre grupla
+        for (const transactionType of transactionTypes) {
+          const filteredData = apiData.content.filter(item => 
+            item.transactionType === transactionType || 
+            this.mapTransactionType(item) === transactionType
+          );
+          
+          if (filteredData.length > 0) {
+            const transformedData = this.transformSettlementData(filteredData, apiParams.storeId);
+            
+            results.push({
+              transactionType,
+              success: true,
+              data: transformedData
+            });
+            
+            console.log(`Settlement ${transactionType}: ${transformedData.length} kayıt`);
+          } else {
+            console.log(`Settlement ${transactionType}: Veri bulunamadı`);
+          }
+        }
+      }
+      
+      return {
+        success: true,
+        results
+      };
+      
+    } catch (error) {
+      console.error('Settlement işleme hatası:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Diğer finansal verileri işle
+   */
+  async processOtherFinancials(apiParams) {
+    try {
+      console.log('=== DİĞER FİNANSAL VERİLER İŞLENİYOR ===');
+      
+      const { sellerId, apiKey, apiSecret, startDate, endDate, transactionTypes } = apiParams;
+      const results = [];
+      
+      // Her transaction type için ayrı API çağrısı yap
+      for (const transactionType of transactionTypes) {
+        try {
+          console.log(`Transaction type işleniyor: ${transactionType}`);
+          
+          const apiData = await this.trendyolService.fetchOtherFinancials(
+            apiKey, 
+            apiSecret, 
+            sellerId, 
+            transactionType,
+            startDate, 
+            endDate
+          );
+          
+          console.log(`${transactionType} API yanıtı:`, {
+            totalElements: apiData?.totalElements || 0,
+            contentLength: apiData?.content?.length || 0
+          });
+          
+          if (apiData && apiData.content && apiData.content.length > 0) {
+            const transformedData = this.transformFinancialData(apiData.content, apiParams.storeId);
+            
+            results.push({
+              transactionType,
+              success: true,
+              data: transformedData
+            });
+            
+            console.log(`Financial ${transactionType}: ${transformedData.length} kayıt`);
+          } else {
+            console.log(`Financial ${transactionType}: Veri bulunamadı`);
+            results.push({
+              transactionType,
+              success: true,
+              data: []
+            });
+          }
+          
+          // API rate limiting için kısa bekleme
+          await this.sleep(500);
+          
+        } catch (typeError) {
+          console.error(`Transaction type ${transactionType} hatası:`, typeError);
+          results.push({
+            transactionType,
+            success: false,
+            error: typeError.message
+          });
+        }
+      }
+      
+      return {
+        success: true,
+        results
+      };
+      
+    } catch (error) {
+      console.error('Financial işleme hatası:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Settlement verilerini dönüştür
+   */
+  transformSettlementData(apiData, storeId) {
+    return apiData.map(item => ({
+      store_id: storeId,
+      settlement_id: item.settlementId || item.id,
+      settlement_date: new Date(item.settlementDate || item.transactionDate),
+      order_number: item.orderNumber,
+      commission_amount: parseFloat(item.commissionAmount || item.commission || 0),
+      seller_revenue: parseFloat(item.sellerRevenue || item.sellerPrice || 0),
+      payment_date: item.paymentDate ? new Date(item.paymentDate) : null,
+      transaction_type: item.transactionType || 'Sale',
+      status: item.status || 'COMPLETED',
+      currency: item.currency || 'TRY',
+      total_price: parseFloat(item.totalPrice || item.amount || 0),
+      created_at: new Date(),
+      updated_at: new Date()
+    }));
+  }
+
+  /**
+   * Finansal verileri dönüştür
+   */
+  transformFinancialData(apiData, storeId) {
+    return apiData.map(item => ({
+      store_id: storeId,
+      transaction_id: item.id || `${Date.now()}_${Math.random()}`,
+      transaction_date: new Date(item.transactionDate),
+      transaction_type: item.transactionType,
+      amount: parseFloat(item.amount || item.debt || item.credit || 0),
+      description: item.description || `${item.transactionType} transaction`,
+      currency: item.currency || 'TRY',
+      order_number: item.orderNumber,
+      receipt_id: item.receiptId,
+      commission_rate: parseFloat(item.commissionRate || 0),
+      payment_period: item.paymentPeriod,
+      created_at: new Date(),
+      updated_at: new Date()
+    }));
+  }
+
+  /**
+   * Transaction type mapping
+   */
+  mapTransactionType(item) {
+    // API'den gelen veriyi frontend transaction type'ına map et
+    const typeMapping = {
+      'SALE': 'Sale',
+      'RETURN': 'Return',
+      'DISCOUNT': 'Discount',
+      'COMMISSION': 'Commission',
+      'REFUND': 'Return'
+    };
+    
+    return typeMapping[item.transactionType?.toUpperCase()] || item.transactionType;
+  }
+
+  /**
+   * Bekleme fonksiyonu
    */
   sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
