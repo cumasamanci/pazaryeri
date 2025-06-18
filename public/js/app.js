@@ -716,58 +716,79 @@ const app = {
         `,        afterRender: () => {
           console.log('Login afterRender çağrıldı');
           
-          const loginForm = document.getElementById('loginForm');
-          if (!loginForm) {
-            console.error('Login form bulunamadı!');
-            return;
-          }
-          
-          loginForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            console.log('Login form submit edildi');
-            
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            
-            console.log('Login veriler:', { email, password: '***' });
-            
-            if (!supabase) {
-              alert('Supabase bağlantısı kurulamadı!');
+          try {
+            const loginForm = document.getElementById('loginForm');
+            if (!loginForm) {
+              console.error('Login form bulunamadı!');
               return;
             }
             
-            try {
-              // Supabase ile giriş yap
-              const { data, error } = await supabase.auth.signInWithPassword({
-                email,
-                password
-              });
-                console.log('Supabase giriş sonucu:', { data, error });
-                if (error) {
-                // Email confirmation hatası için özel mesaj
-                if (error.message.includes('Email not confirmed')) {
-                  alert('E-posta adresiniz henüz doğrulanmamış. Lütfen Supabase yöneticisi ile iletişime geçin veya 5 dakika sonra tekrar deneyin.');
-                } else if (error.message.includes('Invalid login credentials')) {
-                  alert('E-posta veya şifre hatalı. Lütfen kontrol edin.');
-                } else {
-                  alert('Giriş hatası: ' + error.message);
-                }
+            console.log('Login form bulundu, event listener ekleniyor');
+            
+            loginForm.addEventListener('submit', async function(e) {
+              e.preventDefault();
+              console.log('Login form submit edildi');
+              
+              const email = document.getElementById('email').value;
+              const password = document.getElementById('password').value;
+              
+              console.log('Login veriler:', { email, password: '***' });
+              
+              if (!window.supabase) {
+                console.error('Supabase mevcut değil!');
+                alert('Supabase bağlantısı kurulamadı!');
                 return;
               }
+              
+              try {
+                console.log('Supabase login denemesi başlıyor...');
+                
+                // Supabase ile giriş yap
+                const { data, error } = await window.supabase.auth.signInWithPassword({
+                  email,
+                  password
+                });
+                
+                console.log('Supabase giriş sonucu:', { data, error });
+                
+                if (error) {
+                  console.error('Login hatası:', error);
+                  // Email confirmation hatası için özel mesaj
+                  if (error.message.includes('Email not confirmed')) {
+                    alert('E-posta adresiniz henüz doğrulanmamış. Lütfen Supabase yöneticisi ile iletişime geçin veya 5 dakika sonra tekrar deneyin.');
+                  } else if (error.message.includes('Invalid login credentials')) {
+                    alert('E-posta veya şifre hatalı. Lütfen kontrol edin.');
+                  } else {
+                    alert('Giriş hatası: ' + error.message);
+                  }
+                  return;
+                }
+                
                 if (data.session) {
-                // Başarılı giriş
-                localStorage.setItem('token', data.session.access_token);
-                
-                // Auth durumunu güncelle
-                app.checkAuthStatus();
-                
-                window.location.hash = '#/dashboard';
+                  // Başarılı giriş
+                  console.log('Login başarılı, token kaydediliyor');
+                  localStorage.setItem('token', data.session.access_token);
+                  
+                  // Auth durumunu güncelle
+                  app.checkAuthStatus();
+                  
+                  alert('Giriş başarılı! Yönlendiriliyorsunuz...');
+                  window.location.hash = '#/dashboard';
+                } else {
+                  console.error('Session bulunamadı:', data);
+                  alert('Giriş yapıldı ama session oluşmadı');
+                }
+              } catch (error) {
+                console.error('Login JS hatası:', error);
+                alert('Giriş yapılırken bir hata oluştu: ' + error.message);
               }
-            } catch (error) {
-              console.error('Giriş hatası:', error);
-              alert('Giriş yapılırken bir hata oluştu: ' + error.message);
-            }
-          });
+            });
+            
+            console.log('Login event listener eklendi');
+            
+          } catch (error) {
+            console.error('Login afterRender hatası:', error);
+          }
         }
       },
       register: {
@@ -879,87 +900,143 @@ const app = {
         }
       }
     };
-    
-    // Hash değişikliklerini dinle
+      // Hash değişikliklerini dinle
     window.addEventListener('hashchange', this.routeChange.bind(this));
     
     // Sayfa ilk yüklendiğinde
     this.routeChange();
     
-    // Kullanıcı durumunu kontrol et
-    this.checkAuthStatus();
-  },
-    routeChange: function() {
+    // Kullanıcı durumunu kontrol et (biraz gecikmeli)
+    setTimeout(() => {
+      this.checkAuthStatus();
+    }, 500);
+  },  routeChange: function() {
     console.log('RouteChange çağrıldı, hash:', window.location.hash);
     
-    let hash = window.location.hash.substring(2) || 'dashboard';
-    console.log('İşlenen hash:', hash);
-      // Eğer giriş yapılmamışsa ve korumalı bir sayfaya erişilmeye çalışılıyorsa
-    const token = localStorage.getItem('token');
-    if (!token && hash !== 'login' && hash !== 'register') {
-      console.log('Token yok, login\'e yönlendiriliyor');
-      window.location.hash = '#/login';
-      return;
+    // Hash'i düzgün parse et
+    let hash = window.location.hash;
+    if (hash.startsWith('#/')) {
+      hash = hash.substring(2);
+    } else if (hash.startsWith('#')) {
+      hash = hash.substring(1);
     }
     
-    // Eğer giriş yapılmışsa login ve register sayfalarına gidilmesin
-    if (token && (hash === 'login' || hash === 'register')) {
-      console.log('Zaten giriş yapılmış, dashboard\'a yönlendiriliyor');
-      window.location.hash = '#/dashboard';
-      return;
+    // Boş hash'i dashboard'a çevir
+    if (!hash) {
+      hash = 'dashboard';
     }
+    
+    console.log('İşlenen hash:', hash);
     
     // Sayfa içeriğini yükle
     const page = this.pages[hash];
     if (page) {
+      console.log('Sayfa bulundu:', hash);
       document.title = `Trendyol Entegrasyon - ${page.title}`;
-      document.getElementById('app').innerHTML = page.render();
       
-      // Sayfa yüklendikten sonra çalıştırılacak kodlar
-      if (page.afterRender) {
-        page.afterRender();
-      }
+      // Loading göster
+      document.getElementById('app').innerHTML = `
+        <div class="text-center mt-5">
+          <h2>Yükleniyor...</h2>
+          <div class="spinner-border"></div>
+        </div>
+      `;
       
-      this.currentPage = hash;
+      // Kısa bir gecikme ile sayfa içeriğini yükle
+      setTimeout(() => {
+        try {
+          document.getElementById('app').innerHTML = page.render();
+          
+          // Sayfa yüklendikten sonra çalıştırılacak kodlar
+          if (page.afterRender) {
+            console.log('afterRender çalıştırılıyor:', hash);
+            page.afterRender();
+          }
+          
+          this.currentPage = hash;
+        } catch (error) {
+          console.error('Sayfa render hatası:', error);
+          document.getElementById('app').innerHTML = `
+            <div class="text-center mt-5">
+              <h2 class="text-danger">Hata</h2>
+              <p>Sayfa yüklenirken bir hata oluştu: ${error.message}</p>
+              <button class="btn btn-primary" onclick="location.reload()">Sayfayı Yenile</button>
+            </div>
+          `;
+        }
+      }, 100);
+      
     } else {
       // 404 sayfası
+      console.log('Sayfa bulunamadı:', hash);
       document.getElementById('app').innerHTML = `
-        <div class="text-center">
+        <div class="text-center mt-5">
           <h1>404</h1>
-          <p>Sayfa bulunamadı</p>
-          <a href="#/dashboard" class="btn btn-primary">Ana Sayfaya Dön</a>
+          <p>Sayfa bulunamadı: ${hash}</p>
+          <a href="#/login" class="btn btn-primary">Giriş Sayfasına Dön</a>
         </div>
       `;
     }
-  },
-    checkAuthStatus: async function() {
-    const token = localStorage.getItem('token');
-      if (token) {
-      // Token varsa kullanıcı giriş yapmış demektir
-      document.getElementById('loginBtn').classList.add('d-none');
-      document.getElementById('registerBtn').classList.add('d-none');
-      document.getElementById('logoutBtn').classList.remove('d-none');
-      
-      try {
-        // Token'ın geçerliliğini kontrol et
-        const { data, error } = await supabase.auth.getUser();
-        
-        if (error || !data.user) {
-          throw new Error('Token geçersiz');
-        }
-        
-        // Kullanıcı bilgisini güncelle
-        console.log('Giriş yapılmış kullanıcı:', data.user);
-      } catch (error) {
-        console.error('Token doğrulama hatası:', error);
-        // Token geçersizse çıkış yap
-        this.logout();
-      }    } else {
-      document.getElementById('loginBtn').classList.remove('d-none');
-      document.getElementById('registerBtn').classList.remove('d-none');
-      document.getElementById('logoutBtn').classList.add('d-none');
+  },  checkAuthStatus: async function() {
+    console.log('checkAuthStatus çağrıldı');
+    
+    // Navigation'ı güncelle
+    this.updateNavigation();
+    
+    // Auth kontrolü için route kontrolü yap
+    let currentHash = window.location.hash;
+    if (currentHash.startsWith('#/')) {
+      currentHash = currentHash.substring(2);
+    } else if (currentHash.startsWith('#')) {
+      currentHash = currentHash.substring(1);
     }
-      // Çıkış butonuna tıklanınca (sadece bir kez ekle)
+    if (!currentHash) {
+      currentHash = 'dashboard';
+    }
+    
+    const token = localStorage.getItem('token');
+    
+    console.log('Auth kontrol:', { currentHash, hasToken: !!token });
+    
+    // Eğer giriş yapılmamışsa ve korumalı bir sayfadaysa
+    if (!token && currentHash !== 'login' && currentHash !== 'register') {
+      console.log('Token yok, login sayfasına yönlendiriliyor');
+      window.location.hash = '#/login';
+      return;
+    }
+    
+    // Eğer token varsa geçerliliğini kontrol et
+    if (token) {
+      try {
+        if (window.supabase) {
+          const { data, error } = await window.supabase.auth.getUser();
+          
+          if (error || !data.user) {
+            console.log('Token geçersiz, temizleniyor');
+            localStorage.removeItem('token');
+            this.updateNavigation();
+            
+            if (currentHash !== 'login' && currentHash !== 'register') {
+              window.location.hash = '#/login';
+            }
+          } else {
+            console.log('Token geçerli, kullanıcı:', data.user.email);
+            
+            // Eğer login/register sayfasındaysa dashboard'a yönlendir
+            if (currentHash === 'login' || currentHash === 'register') {
+              console.log('Giriş yapılmış, dashboard\'a yönlendiriliyor');
+              window.location.hash = '#/dashboard';
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Auth kontrol hatası:', error);
+        localStorage.removeItem('token');
+        this.updateNavigation();
+      }
+    }
+    
+    // Çıkış butonuna event listener ekle (sadece bir kez)
     const logoutBtn = document.getElementById('logoutBtn')?.querySelector('a');
     if (logoutBtn && !logoutBtn.hasAttribute('data-logout-attached')) {
       logoutBtn.setAttribute('data-logout-attached', 'true');
@@ -968,7 +1045,26 @@ const app = {
         this.logout();
       });
     }
-  },    logout: async function() {
+  },
+
+  updateNavigation: function() {
+    const token = localStorage.getItem('token');
+    const loginBtn = document.getElementById('loginBtn');
+    const registerBtn = document.getElementById('registerBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    
+    if (token) {
+      // Giriş yapılmış
+      if (loginBtn) loginBtn.classList.add('d-none');
+      if (registerBtn) registerBtn.classList.add('d-none');
+      if (logoutBtn) logoutBtn.classList.remove('d-none');
+    } else {
+      // Giriş yapılmamış
+      if (loginBtn) loginBtn.classList.remove('d-none');
+      if (registerBtn) registerBtn.classList.remove('d-none');
+      if (logoutBtn) logoutBtn.classList.add('d-none');
+    }
+  },logout: async function() {
     try {
       // Supabase ile çıkış yap
       await supabase.auth.signOut();
@@ -2132,3 +2228,19 @@ async function deleteJob(jobId) {
 }
 
 // === END JOBS PAGE FUNCTIONS ===
+
+// Uygulamayı başlat
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOM loaded, app başlatılıyor...');
+  
+  // Supabase'in yüklenmesini bekle
+  if (typeof window.supabase === 'undefined') {
+    console.log('Supabase henüz yüklenmemiş, bekliyor...');
+    setTimeout(() => {
+      app.init();
+    }, 1000);
+  } else {
+    console.log('Supabase mevcut, app başlatılıyor...');
+    app.init();
+  }
+});
