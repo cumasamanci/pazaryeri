@@ -180,6 +180,64 @@ router.get('/automation/jobs', authenticateUser, async (req, res) => {
   }
 });
 
+// Tek bir otomasyon işinin durumunu getir
+router.get('/automation/jobs/:jobId', authenticateUser, async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    
+    console.log('Job durumu istendi:', jobId);
+    
+    const result = await paymentService.getAutomationJobById(jobId, req.user.id);
+    
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        error: 'Otomasyon işi bulunamadı'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Otomasyon işi durumu alınırken hata:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Otomasyon işini sil
+router.delete('/automation/jobs/:jobId', authenticateUser, async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    
+    console.log('Job siliniyor:', jobId);
+    
+    const result = await paymentService.deleteAutomationJob(jobId, req.user.id);
+    
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        error: 'Otomasyon işi bulunamadı'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Otomasyon işi silindi'
+    });
+  } catch (error) {
+    console.error('Otomasyon işi silinirken hata:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Mağaza API'sini test et
 router.post('/test-api/:storeId', authenticateUser, async (req, res) => {
   try {

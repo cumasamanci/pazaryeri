@@ -532,8 +532,160 @@ const app = {
           </div>
         `,
         afterRender: async () => {
-          await loadPayments();
-          initPaymentEvents();
+          await loadPayments();          initPaymentEvents();
+        }
+      },
+      jobs: {
+        title: 'Otomasyon İşleri',
+        render: () => `
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Otomasyon İşleri</h1>
+            <button class="btn btn-primary" onclick="window.location.hash = '#/payments'">
+              <i class="fas fa-plus"></i> Yeni Otomasyon Başlat
+            </button>
+          </div>
+
+          <!-- Filtreler -->
+          <div class="card mb-4">
+            <div class="card-header">
+              <h5 class="mb-0">
+                <i class="fas fa-filter"></i> Filtreler
+              </h5>
+            </div>
+            <div class="card-body">
+              <form id="jobsFilterForm">
+                <div class="row">
+                  <div class="col-md-3">
+                    <div class="mb-3">
+                      <label for="jobsFilterStore" class="form-label">Mağaza</label>
+                      <select class="form-select" id="jobsFilterStore">
+                        <option value="">Tüm Mağazalar</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="mb-3">
+                      <label for="jobsFilterStatus" class="form-label">Durum</label>
+                      <select class="form-select" id="jobsFilterStatus">
+                        <option value="">Tüm Durumlar</option>
+                        <option value="pending">Bekliyor</option>
+                        <option value="running">Çalışıyor</option>
+                        <option value="completed">Tamamlandı</option>
+                        <option value="failed">Başarısız</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="mb-3">
+                      <label for="jobsFilterApiType" class="form-label">API Tipi</label>
+                      <select class="form-select" id="jobsFilterApiType">
+                        <option value="">Tüm API Tipleri</option>
+                        <option value="settlements">Settlements</option>
+                        <option value="otherfinancials">Other Financials</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="mb-3">
+                      <label class="form-label">&nbsp;</label>
+                      <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                          <i class="fas fa-search"></i> Filtrele
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="clearJobsFiltersBtn">
+                          <i class="fas fa-refresh"></i> Temizle
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- İstatistikler -->
+          <div class="row mb-4" id="jobsStats">
+            <div class="col-md-3">
+              <div class="card">
+                <div class="card-body text-center">
+                  <h3 class="text-primary" id="totalJobs">0</h3>
+                  <p class="mb-0">Toplam İş</p>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="card">
+                <div class="card-body text-center">
+                  <h3 class="text-success" id="completedJobs">0</h3>
+                  <p class="mb-0">Tamamlanan</p>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="card">
+                <div class="card-body text-center">
+                  <h3 class="text-warning" id="runningJobs">0</h3>
+                  <p class="mb-0">Çalışan</p>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="card">
+                <div class="card-body text-center">
+                  <h3 class="text-danger" id="failedJobs">0</h3>
+                  <p class="mb-0">Başarısız</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Jobs Tablosu -->
+          <div class="card">
+            <div class="card-header">
+              <h5 class="mb-0">
+                <i class="fas fa-list"></i> Otomasyon İşleri Listesi
+              </h5>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-striped" id="jobsTable">
+                  <thead>
+                    <tr>
+                      <th>İş Adı</th>
+                      <th>Mağaza</th>
+                      <th>API Tipi</th>
+                      <th>İşlem Tipleri</th>
+                      <th>Durum</th>
+                      <th>İlerleme</th>
+                      <th>Kayıt Sayısı</th>
+                      <th>Tarih</th>
+                      <th>İşlemler</th>
+                    </tr>
+                  </thead>
+                  <tbody id="jobsTableBody">
+                    <tr>
+                      <td colspan="9" class="text-center">
+                        <div class="spinner-border" role="status">
+                          <span class="visually-hidden">Yükleniyor...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              
+              <!-- Pagination -->
+              <nav aria-label="Sayfa navigasyonu" id="jobsPaginationNav">
+                <ul class="pagination justify-content-center" id="jobsPaginationList">
+                  <!-- Pagination items will be generated here -->
+                </ul>
+              </nav>
+            </div>
+          </div>
+        `,
+        afterRender: async () => {
+          await loadJobs();
+          initJobsEvents();
         }
       },
       login: {
@@ -1411,41 +1563,90 @@ async function loadStoreOptions() {
 }
 
 // Transaction type'ları yükle
-function loadTransactionTypes(apiType) {
+async function loadTransactionTypes(apiType) {
   const container = document.getElementById('transactionTypesContainer');
   const filterSelect = document.getElementById('filterTransactionType');
   
   if (!container || !apiType) return;
 
-  let types = [];
-  if (apiType === 'settlements') {
-    types = [
-      'Sale', 'Return', 'Discount', 'DiscountCancel', 
-      'Coupon', 'CouponCancel', 'ProvisionPositive', 'ProvisionNegative'
-    ];
-  } else if (apiType === 'otherfinancials') {
-    types = [
-      'Stoppage', 'CashAdvance', 'WireTransfer', 'IncomingTransfer',
-      'ReturnInvoice', 'CommissionAgreementInvoice', 'PaymentOrder', 'DeductionInvoices'
-    ];
-  }
-
-  // Checkbox'ları oluştur
-  container.innerHTML = types.map(type => `
-    <div class="col-md-4 mb-2">
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" value="${type}" id="type_${type}">
-        <label class="form-check-label" for="type_${type}">
-          ${type}
-        </label>
+  try {
+    console.log('Transaction types yükleniyor, apiType:', apiType);
+    
+    // API'den transaction type'ları getir
+    const response = await fetch(`/api/payments/transaction-types/${apiType}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getAuthToken()}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Transaction types alınamadı');
+    }
+    
+    const result = await response.json();
+    const types = result.data || [];
+    
+    console.log('Transaction types alındı:', types);
+    
+    // Checkbox'ları oluştur
+    container.innerHTML = types.map(type => `
+      <div class="col-md-4 mb-2">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="${type.value}" id="type_${type.value}">
+          <label class="form-check-label" for="type_${type.value}" title="${type.description || type.label}">
+            ${type.label}
+          </label>
+        </div>
       </div>
-    </div>
-  `).join('');
+    `).join('');
 
-  // Filtre select'ini güncelle
-  if (filterSelect) {
-    filterSelect.innerHTML = '<option value="">Tüm İşlem Tipleri</option>' +
-      types.map(type => `<option value="${type}">${type}</option>`).join('');
+    // Filtre select'ini güncelle
+    if (filterSelect) {
+      filterSelect.innerHTML = '<option value="">Tüm İşlem Tipleri</option>' +
+        types.map(type => `<option value="${type.value}">${type.label}</option>`).join('');
+    }
+    
+  } catch (error) {
+    console.error('Transaction types yüklenirken hata:', error);
+    
+    // Fallback olarak hardcoded types kullan
+    let types = [];
+    if (apiType === 'settlements') {
+      types = [
+        { value: 'Sale', label: 'Satış', description: 'Satış işlemleri' },
+        { value: 'Return', label: 'İade', description: 'İade işlemleri' },
+        { value: 'Commission', label: 'Komisyon', description: 'Komisyon kesintileri' },
+        { value: 'Discount', label: 'İndirim', description: 'İndirim işlemleri' },
+        { value: 'Refund', label: 'Geri Ödeme', description: 'Geri ödeme işlemleri' }
+      ];
+    } else {
+      types = [
+        { value: 'Advertising', label: 'Reklam', description: 'Reklam giderleri' },
+        { value: 'StorageAndHandling', label: 'Depolama', description: 'Depolama ve kargo giderleri' },
+        { value: 'FastDelivery', label: 'Hızlı Teslimat', description: 'Hızlı teslimat giderleri' },
+        { value: 'Commission', label: 'Komisyon', description: 'Komisyon kesintileri' }
+      ];
+    }
+
+    // Checkbox'ları oluştur
+    container.innerHTML = types.map(type => `
+      <div class="col-md-4 mb-2">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="${type.value}" id="type_${type.value}">
+          <label class="form-check-label" for="type_${type.value}" title="${type.description}">
+            ${type.label}
+          </label>
+        </div>
+      </div>
+    `).join('');
+
+    // Filtre select'ini güncelle
+    if (filterSelect) {
+      filterSelect.innerHTML = '<option value="">Tüm İşlem Tipleri</option>' +
+        types.map(type => `<option value="${type.value}">${type.label}</option>`).join('');
+    }
   }
 }
 
@@ -1636,7 +1837,298 @@ function clearFilters() {
   loadPayments();
 }
 
-// Uygulamayı başlat
-document.addEventListener('DOMContentLoaded', function() {
-  app.init();
-});
+// === JOBS PAGE FUNCTIONS ===
+
+// Jobs sayfası için event handler'ları init et
+function initJobsEvents() {
+  // Filtre formu
+  const jobsFilterForm = document.getElementById('jobsFilterForm');
+  if (jobsFilterForm) {
+    jobsFilterForm.addEventListener('submit', handleJobsFilterSubmit);
+  }
+
+  // Filtreleri temizle butonu
+  const clearJobsFiltersBtn = document.getElementById('clearJobsFiltersBtn');
+  if (clearJobsFiltersBtn) {
+    clearJobsFiltersBtn.addEventListener('click', clearJobsFilters);
+  }
+
+  // Stores dropdown'ını yükle
+  loadStoresForJobsFilter();
+}
+
+// Jobs listesini yükle
+async function loadJobs(filters = {}) {
+  try {
+    console.log('Jobs yükleniyor, filtreler:', filters);
+    
+    const queryParams = new URLSearchParams(filters).toString();
+    const url = `/api/payments/automation/jobs${queryParams ? '?' + queryParams : ''}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getAuthToken()}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Jobs alınamadı');
+    }
+
+    const result = await response.json();
+    
+    console.log('Jobs API yanıtı:', result);
+    
+    // Jobs tablosunu güncelle
+    renderJobsTable(result.data || []);
+    
+    // İstatistikleri güncelle
+    updateJobsStats(result.stats || {});
+    
+  } catch (error) {
+    console.error('Jobs yüklenirken hata:', error);
+    showNotification('Jobs yüklenirken hata oluştu', 'error');
+    
+    // Hata durumunda boş tablo göster
+    document.getElementById('jobsTableBody').innerHTML = `
+      <tr>
+        <td colspan="9" class="text-center text-danger">
+          <i class="fas fa-exclamation-circle"></i> Veriler yüklenemedi
+        </td>
+      </tr>
+    `;
+  }
+}
+
+// Jobs tablosunu render et
+function renderJobsTable(jobs) {
+  const tbody = document.getElementById('jobsTableBody');
+  
+  if (!jobs || jobs.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="9" class="text-center text-muted">
+          <i class="fas fa-inbox"></i> Henüz otomasyon işi yok
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = jobs.map(job => `
+    <tr>
+      <td>
+        <strong>${job.job_name || 'İsimsiz İş'}</strong>
+        <br>
+        <small class="text-muted">${job.id}</small>
+      </td>
+      <td>${job.store_name || 'Bilinmiyor'}</td>
+      <td>
+        <span class="badge bg-info">${job.api_type || 'N/A'}</span>
+      </td>
+      <td>
+        <small>${(job.transaction_types || []).join(', ')}</small>
+      </td>
+      <td>
+        <span class="badge ${getJobStatusBadgeClass(job.status)}">${getJobStatusText(job.status)}</span>
+      </td>
+      <td>
+        <div class="progress" style="height: 20px;">
+          <div class="progress-bar ${getJobProgressBarClass(job.status)}" 
+               style="width: ${getJobProgressPercentage(job)}%">
+            ${getJobProgressPercentage(job)}%
+          </div>
+        </div>
+        <small class="text-muted">
+          ${job.completed_periods || 0}/${job.total_periods || 0} dönem
+        </small>
+      </td>
+      <td>
+        <span class="badge bg-secondary">${job.total_records || 0}</span>
+      </td>
+      <td>
+        <small>
+          ${formatDate(job.created_at)}<br>
+          <span class="text-muted">${formatTime(job.created_at)}</span>
+        </small>
+      </td>
+      <td>
+        <div class="btn-group btn-group-sm">
+          <button class="btn btn-outline-primary" onclick="showJobDetails('${job.id}')" title="Detaylar">
+            <i class="fas fa-eye"></i>
+          </button>
+          ${job.status === 'running' ? `
+            <button class="btn btn-outline-warning" onclick="refreshJobStatus('${job.id}')" title="Yenile">
+              <i class="fas fa-refresh"></i>
+            </button>
+          ` : ''}
+          ${job.status === 'failed' || job.status === 'completed' ? `
+            <button class="btn btn-outline-danger" onclick="deleteJob('${job.id}')" title="Sil">
+              <i class="fas fa-trash"></i>
+            </button>
+          ` : ''}
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// Jobs istatistiklerini güncelle
+function updateJobsStats(stats) {
+  document.getElementById('totalJobs').textContent = stats.total || 0;
+  document.getElementById('completedJobs').textContent = stats.completed || 0;
+  document.getElementById('runningJobs').textContent = stats.running || 0;
+  document.getElementById('failedJobs').textContent = stats.failed || 0;
+}
+
+// Job durum badge class
+function getJobStatusBadgeClass(status) {
+  switch(status) {
+    case 'completed': return 'bg-success';
+    case 'running': return 'bg-warning';
+    case 'pending': return 'bg-info';
+    case 'failed': return 'bg-danger';
+    default: return 'bg-secondary';
+  }
+}
+
+// Job durum text
+function getJobStatusText(status) {
+  switch(status) {
+    case 'completed': return 'Tamamlandı';
+    case 'running': return 'Çalışıyor';
+    case 'pending': return 'Bekliyor';
+    case 'failed': return 'Başarısız';
+    default: return status;
+  }
+}
+
+// Job progress bar class
+function getJobProgressBarClass(status) {
+  switch(status) {
+    case 'completed': return 'bg-success';
+    case 'running': return 'bg-warning progress-bar-striped progress-bar-animated';
+    case 'pending': return 'bg-info';
+    case 'failed': return 'bg-danger';
+    default: return 'bg-secondary';
+  }
+}
+
+// Job progress percentage
+function getJobProgressPercentage(job) {
+  if (!job.total_periods || job.total_periods === 0) return 0;
+  return Math.round((job.completed_periods || 0) / job.total_periods * 100);
+}
+
+// Time formatter
+function formatTime(dateString) {
+  if (!dateString) return '-';
+  return new Date(dateString).toLocaleTimeString('tr-TR');
+}
+
+// Jobs filter submit handler
+async function handleJobsFilterSubmit(e) {
+  e.preventDefault();
+  
+  const filters = {
+    store_id: document.getElementById('jobsFilterStore').value,
+    status: document.getElementById('jobsFilterStatus').value,
+    api_type: document.getElementById('jobsFilterApiType').value
+  };
+
+  console.log('Jobs filtreleri uygulanıyor:', filters);
+  await loadJobs(filters);
+}
+
+// Jobs filtrelerini temizle
+function clearJobsFilters() {
+  document.getElementById('jobsFilterForm').reset();
+  loadJobs();
+}
+
+// Jobs için stores dropdown yükle
+async function loadStoresForJobsFilter() {
+  try {
+    const stores = await getStores();
+    const select = document.getElementById('jobsFilterStore');
+    
+    if (select) {
+      select.innerHTML = '<option value="">Tüm Mağazalar</option>' +
+        stores.map(store => `<option value="${store.id}">${store.name}</option>`).join('');
+    }
+  } catch (error) {
+    console.error('Stores yüklenirken hata:', error);
+  }
+}
+
+// Job detaylarını göster
+async function showJobDetails(jobId) {
+  try {
+    const response = await fetch(`/api/payments/automation/jobs/${jobId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getAuthToken()}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Job detayları alınamadı');
+    }
+    
+    const result = await response.json();
+    const job = result.data;
+    
+    showAutomationStatusModal(job);
+    
+  } catch (error) {
+    console.error('Job detayları alınırken hata:', error);
+    showNotification('Job detayları alınamadı', 'error');
+  }
+}
+
+// Job durumunu yenile
+async function refreshJobStatus(jobId) {
+  try {
+    await showAutomationStatus(jobId);
+    // Sayfayı yenile
+    setTimeout(() => {
+      loadJobs();
+    }, 1000);
+  } catch (error) {
+    console.error('Job durumu yenilenirken hata:', error);
+    showNotification('Job durumu yenilenemedi', 'error');
+  }
+}
+
+// Job sil
+async function deleteJob(jobId) {
+  if (!confirm('Bu otomasyon işini silmek istediğinizden emin misiniz?')) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/payments/automation/jobs/${jobId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getAuthToken()}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Job silinemedi');
+    }
+    
+    showNotification('Otomasyon işi silindi', 'success');
+    loadJobs(); // Listeyi yenile
+    
+  } catch (error) {
+    console.error('Job silinirken hata:', error);
+    showNotification('Job silinemedi', 'error');
+  }
+}
+
+// === END JOBS PAGE FUNCTIONS ===

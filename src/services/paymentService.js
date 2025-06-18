@@ -322,7 +322,6 @@ class PaymentService {
       throw error;
     }
   }
-
   /**
    * Otomasyon job'larını getir
    */
@@ -340,6 +339,64 @@ class PaymentService {
       };
     } catch (error) {
       console.error('Otomasyon jobları alınırken hata:', error);
+      throw error;
+    }
+  }
+  /**
+   * Tek bir otomasyon job'ını getir
+   */
+  async getAutomationJobById(jobId, userId) {
+    try {
+      console.log('getAutomationJobById çağrıldı:', { jobId, userId });
+      
+      const job = await AutomationJobModel.getById(jobId);
+      
+      if (!job) {
+        console.log('Job bulunamadı:', jobId);
+        return null;
+      }
+      
+      // Kullanıcı kontrolü
+      if (job.user_id !== userId) {
+        console.log('Kullanıcı yetki hatası:', { jobUserId: job.user_id, requestUserId: userId });
+        return null;
+      }
+      
+      console.log('Job bulundu:', job);
+      return job;
+    } catch (error) {
+      console.error('Otomasyon job bilgisi alınırken hata:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Otomasyon job'ını sil
+   */
+  async deleteAutomationJob(jobId, userId) {
+    try {
+      console.log('deleteAutomationJob çağrıldı:', { jobId, userId });
+      
+      // Önce job'ın varlığını ve kullanıcı yetkisini kontrol et
+      const job = await this.getAutomationJobById(jobId, userId);
+      
+      if (!job) {
+        console.log('Job bulunamadı veya yetki yok:', jobId);
+        return null;
+      }
+      
+      // Çalışan job'ları silmeye izin verme
+      if (job.status === 'running' || job.status === 'pending') {
+        throw new Error('Çalışan veya bekleyen otomasyon işleri silinemez');
+      }
+      
+      // Job'ı sil
+      const result = await AutomationJobModel.delete(jobId);
+      
+      console.log('Job silindi:', jobId);
+      return result;
+    } catch (error) {
+      console.error('Otomasyon job silinirken hata:', error);
       throw error;
     }
   }
@@ -416,18 +473,17 @@ class PaymentService {
       throw error;
     }
   }
-
   /**
    * Transaction tipi seçeneklerini getir
    */
   getTransactionTypeOptions(apiType) {
-    const descriptions = this.trendyolService.getTransactionTypeDescriptions();
+    const descriptions = this.getTransactionTypeDescriptions();
     
     let types;
     if (apiType === 'settlements') {
-      types = this.trendyolService.getSettlementTransactionTypes();
+      types = this.getSettlementTransactionTypes();
     } else {
-      types = this.trendyolService.getOtherFinancialsTransactionTypes();
+      types = this.getOtherFinancialsTransactionTypes();
     }
 
     return types.map(type => ({
@@ -435,6 +491,49 @@ class PaymentService {
       label: type,
       description: descriptions[type] || type
     }));
+  }
+
+  /**
+   * Settlement transaction types
+   */
+  getSettlementTransactionTypes() {
+    return [
+      'Sale',
+      'Return', 
+      'Commission',
+      'Discount',
+      'Refund'
+    ];
+  }
+
+  /**
+   * Other financials transaction types  
+   */
+  getOtherFinancialsTransactionTypes() {
+    return [
+      'Advertising',
+      'StorageAndHandling',
+      'FastDelivery',
+      'Commission',
+      'Discount',
+      'Return'
+    ];
+  }
+
+  /**
+   * Transaction type açıklamaları
+   */
+  getTransactionTypeDescriptions() {
+    return {
+      'Sale': 'Satış işlemleri',
+      'Return': 'İade işlemleri',
+      'Commission': 'Komisyon kesintileri',
+      'Discount': 'İndirim işlemleri', 
+      'Refund': 'Geri ödeme işlemleri',
+      'Advertising': 'Reklam giderleri',
+      'StorageAndHandling': 'Depolama ve kargo giderleri',
+      'FastDelivery': 'Hızlı teslimat giderleri'
+    };
   }
 
   /**
@@ -468,11 +567,10 @@ class PaymentService {
           console.log(`İşlenen transaction type: ${transactionType}`);
           
           let filteredData = [];
-          
-          // Transaction type'a göre verileri filtrele
+            // Transaction type'a göre verileri filtrele ve türet
           switch (transactionType) {
             case 'Sale':
-              // Normal satışlar
+              // Normal satışlar - teslim edilmiş ve pozitif tutar
               filteredData = apiData.content.filter(item => 
                 item.status === 'COMPLETED' && 
                 !item.isReturn && 
@@ -482,52 +580,96 @@ class PaymentService {
               break;
               
             case 'Return':
-              // İadeler
+              // İadeler - ya return flag'i var ya da cancelled statü
               filteredData = apiData.content.filter(item => 
-                item.isReturn || item.status === 'RETURNED'
+                item.isReturn || 
+                item.status === 'RETURNED' || 
+                item.status === 'Cancelled' ||
+                (item.totalPrice || 0) < 0
               );
               break;
               
             case 'Discount':
-              // İndirimler - totalDiscount > 0 olanlar
+              // İndirimler - totalDiscount > 0 veya TY indirimi olan
               filteredData = apiData.content.filter(item => 
-                (item.totalDiscount || 0) > 0 || (item.totalTyDiscount || 0) > 0
+                (item.totalDiscount || 0) > 0 || 
+                (item.totalTyDiscount || 0) > 0 ||
+                (item.discountDetails && item.discountDetails.length > 0)
               );
+              // Her discount için ayrı kayıt oluştur
+              filteredData = filteredData.map(item => ({
+                ...item,
+                transactionAmount: item.totalDiscount || item.totalTyDiscount || 0,
+                originalPrice: item.totalPrice
+              }));
               break;
               
             case 'DiscountCancel':
-              // İndirim iptalleri - genelde negatif değerler
+              // İndirim iptalleri - negatif indirimler
               filteredData = apiData.content.filter(item => 
-                (item.totalDiscount || 0) < 0
+                (item.totalDiscount || 0) < 0 || 
+                (item.discountCancellation && item.discountCancellation.length > 0)
               );
               break;
               
             case 'Coupon':
-            case 'CouponCancel':
-              // Kupon kullanımları - couponDiscount alanı varsa
+              // Kupon kullanımları - kupon indirimi pozitif
               filteredData = apiData.content.filter(item => 
-                item.couponDiscount && (transactionType === 'Coupon' ? 
-                  item.couponDiscount > 0 : item.couponDiscount < 0)
+                (item.couponDiscount && item.couponDiscount > 0) ||
+                (item.coupons && item.coupons.length > 0)
+              );
+              // Her kupon için ayrı transaction oluştur
+              filteredData = filteredData.flatMap(item => {
+                if (item.coupons && item.coupons.length > 0) {
+                  return item.coupons.map(coupon => ({
+                    ...item,
+                    transactionAmount: coupon.discount || item.couponDiscount || 0,
+                    couponCode: coupon.code || 'N/A'
+                  }));
+                }
+                return [{
+                  ...item,
+                  transactionAmount: item.couponDiscount || 0
+                }];
+              });
+              break;
+              
+            case 'CouponCancel':
+              // Kupon iptalleri
+              filteredData = apiData.content.filter(item => 
+                (item.couponDiscount && item.couponDiscount < 0) ||
+                (item.couponCancellations && item.couponCancellations.length > 0)
               );
               break;
               
             case 'ProvisionPositive':
-              // Pozitif komisyon işlemleri
+              // Pozitif komisyon işlemleri - tüm completed orderlar için komisyon
               filteredData = apiData.content.filter(item => 
-                (item.commission || 0) > 0
-              );
+                item.status === 'COMPLETED' && (item.totalPrice || 0) > 0
+              ).map(item => ({
+                ...item,
+                transactionAmount: Math.round((item.totalPrice || 0) * 0.15 * 100) / 100, // %15 komisyon
+                commissionRate: 15
+              }));
               break;
               
             case 'ProvisionNegative':
-              // Negatif komisyon işlemleri
+              // Negatif komisyon işlemleri - iadeler için komisyon iadesi
               filteredData = apiData.content.filter(item => 
-                (item.commission || 0) < 0
-              );
+                item.isReturn || item.status === 'RETURNED' || (item.totalPrice || 0) < 0
+              ).map(item => ({
+                ...item,
+                transactionAmount: -Math.round(Math.abs(item.totalPrice || 0) * 0.15 * 100) / 100, // Negatif komisyon
+                commissionRate: -15
+              }));
               break;
               
             default:
-              // Bilinmeyen tip için tüm verileri kullan
-              filteredData = apiData.content;
+              // Diğer tipler için tüm verileri kullan
+              filteredData = apiData.content.map(item => ({
+                ...item,
+                transactionAmount: item.totalPrice || 0
+              }));
           }
           
           if (filteredData.length > 0) {

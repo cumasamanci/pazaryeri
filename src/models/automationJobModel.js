@@ -49,7 +49,6 @@ const AutomationJobModel = {
       throw error;
     }
   },
-
   // Automation Job sayısını getir
   getCount: async (filters = {}) => {
     try {
@@ -75,6 +74,53 @@ const AutomationJobModel = {
     } catch (error) {
       console.error('Automation Job sayısı alınırken hata:', error);
       throw error;
+    }
+  },
+
+  // İstatistik verilerini getir
+  getStats: async (filters = {}) => {
+    try {
+      let query = db.getClient().from(AutomationJobModel.tableName).select('status');
+
+      // Filtreleri ekle
+      if (filters.user_id) {
+        query = query.eq('user_id', filters.user_id);
+      }
+      if (filters.store_id) {
+        query = query.eq('store_id', filters.store_id);
+      }
+      if (filters.api_type) {
+        query = query.eq('api_type', filters.api_type);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // Status'lara göre grupla
+      const stats = {
+        total: data.length,
+        completed: 0,
+        running: 0,
+        pending: 0,
+        failed: 0
+      };
+
+      data.forEach(job => {
+        if (stats.hasOwnProperty(job.status)) {
+          stats[job.status]++;
+        }
+      });
+
+      return stats;
+    } catch (error) {
+      console.error('Automation Job stats alınırken hata:', error);
+      return {
+        total: 0,
+        completed: 0,
+        running: 0,
+        pending: 0,
+        failed: 0
+      };
     }
   },
 
@@ -221,7 +267,6 @@ const AutomationJobModel = {
       throw error;
     }
   },
-
   // Son job'ları getir
   getRecentJobs: async (userId, limit = 10) => {
     try {
@@ -236,6 +281,22 @@ const AutomationJobModel = {
       return data || [];
     } catch (error) {
       console.error('Son automation job\'lar alınırken hata:', error);
+      throw error;
+    }
+  },
+
+  // Automation job sil
+  delete: async (id) => {
+    try {
+      const { error } = await db.getClient()
+        .from(AutomationJobModel.tableName)
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error(`Automation Job silinirken hata (ID: ${id}):`, error);
       throw error;
     }
   }
