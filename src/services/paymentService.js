@@ -181,15 +181,19 @@ class PaymentService {
                 success: typeResult.success,
                 dataCount: typeResult.data ? typeResult.data.length : 0
               });
-              
-              if (typeResult.success && typeResult.data && typeResult.data.length > 0) {
-                const transformedData = this.transformApiData(typeResult.data, store.id, apiType);
-                console.log(`${typeResult.data.length} kayıt dönüştürüldü`);
+                if (typeResult.success && typeResult.data && typeResult.data.length > 0) {
+                let transformedData;
                 
                 if (apiType === 'settlements') {
+                  // Settlement verileri için özel transform metodu kullan
+                  transformedData = this.transformSettlementData(typeResult.data, store.id);
+                  console.log(`${typeResult.data.length} settlement kaydı dönüştürüldü`);
                   console.log('Settlement verileri kaydediliyor...');
                   await SettlementModel.createBatch(transformedData);
                 } else {
+                  // Diğer finansal veriler için genel transform metodu
+                  transformedData = this.transformApiData(typeResult.data, store.id, apiType);
+                  console.log(`${typeResult.data.length} financial kaydı dönüştürüldü`);
                   console.log('Other Financial verileri kaydediliyor...');
                   await OtherFinancialModel.createBatch(transformedData);
                 }
@@ -248,13 +252,12 @@ class PaymentService {
 
   /**
    * API verilerini veritabanı formatına dönüştür
-   */
-  transformApiData(apiData, storeId, apiType) {
+   */  transformApiData(apiData, storeId, apiType) {
     return apiData.map(item => {
       const baseData = {
         store_id: storeId,
-        transaction_id: item.id.toString(),
-        transaction_date: new Date(item.transactionDate),
+        transaction_id: (item.id || item.settlementId || `${Date.now()}_${Math.random()}`).toString(),
+        transaction_date: new Date(item.transactionDate || item.settlementDate || item.orderDate || Date.now()),
         barcode: item.barcode,
         transaction_type: item.transactionType,
         receipt_id: item.receiptId,
@@ -263,13 +266,13 @@ class PaymentService {
         credit: parseFloat(item.credit || 0),
         payment_period: item.paymentPeriod,
         commission_rate: parseFloat(item.commissionRate || 0),
-        commission_amount: parseFloat(item.commissionAmount || 0),
+        commission_amount: parseFloat(item.commissionAmount || item.commission || 0),
         commission_invoice_serial_number: item.commissionInvoiceSerialNumber,
         seller_revenue: parseFloat(item.sellerRevenue || 0),
         order_number: item.orderNumber,
         payment_order_id: item.paymentOrderId,
         payment_date: item.paymentDate ? new Date(item.paymentDate) : null,
-        seller_id: parseInt(item.sellerId),
+        seller_id: parseInt(item.sellerId || 0),
         store_name: item.storeName,
         store_address: item.storeAddress,
         country: item.country || 'Türkiye',
@@ -456,20 +459,85 @@ class PaymentService {
         totalElements: apiData?.totalElements || 0,
         contentLength: apiData?.content?.length || 0
       });
-      
-      // Verileri settlement formatına dönüştür
+        // Verileri settlement formatına dönüştür
       const results = [];
       
       if (apiData && apiData.content && apiData.content.length > 0) {
-        // Settlement verilerini transaction type'larına göre grupla
+        // Tüm settlement verilerini transaction type'larına göre ayır
         for (const transactionType of transactionTypes) {
-          const filteredData = apiData.content.filter(item => 
-            item.transactionType === transactionType || 
-            this.mapTransactionType(item) === transactionType
-          );
+          console.log(`İşlenen transaction type: ${transactionType}`);
+          
+          let filteredData = [];
+          
+          // Transaction type'a göre verileri filtrele
+          switch (transactionType) {
+            case 'Sale':
+              // Normal satışlar
+              filteredData = apiData.content.filter(item => 
+                item.status === 'COMPLETED' && 
+                !item.isReturn && 
+                !item.isRefund &&
+                (item.totalPrice || 0) > 0
+              );
+              break;
+              
+            case 'Return':
+              // İadeler
+              filteredData = apiData.content.filter(item => 
+                item.isReturn || item.status === 'RETURNED'
+              );
+              break;
+              
+            case 'Discount':
+              // İndirimler - totalDiscount > 0 olanlar
+              filteredData = apiData.content.filter(item => 
+                (item.totalDiscount || 0) > 0 || (item.totalTyDiscount || 0) > 0
+              );
+              break;
+              
+            case 'DiscountCancel':
+              // İndirim iptalleri - genelde negatif değerler
+              filteredData = apiData.content.filter(item => 
+                (item.totalDiscount || 0) < 0
+              );
+              break;
+              
+            case 'Coupon':
+            case 'CouponCancel':
+              // Kupon kullanımları - couponDiscount alanı varsa
+              filteredData = apiData.content.filter(item => 
+                item.couponDiscount && (transactionType === 'Coupon' ? 
+                  item.couponDiscount > 0 : item.couponDiscount < 0)
+              );
+              break;
+              
+            case 'ProvisionPositive':
+              // Pozitif komisyon işlemleri
+              filteredData = apiData.content.filter(item => 
+                (item.commission || 0) > 0
+              );
+              break;
+              
+            case 'ProvisionNegative':
+              // Negatif komisyon işlemleri
+              filteredData = apiData.content.filter(item => 
+                (item.commission || 0) < 0
+              );
+              break;
+              
+            default:
+              // Bilinmeyen tip için tüm verileri kullan
+              filteredData = apiData.content;
+          }
           
           if (filteredData.length > 0) {
-            const transformedData = this.transformSettlementData(filteredData, apiParams.storeId);
+            // Transaction type'ı her veri elemanına ekle
+            const dataWithType = filteredData.map(item => ({
+              ...item,
+              transactionType: transactionType
+            }));
+            
+            const transformedData = this.transformSettlementData(dataWithType, apiParams.storeId);
             
             results.push({
               transactionType,
@@ -565,24 +633,23 @@ class PaymentService {
       console.error('Financial işleme hatası:', error);
       throw error;
     }
-  }
-
-  /**
-   * Settlement verilerini dönüştür
-   */
-  transformSettlementData(apiData, storeId) {
+  }  /**
+   * Settlement verilerini dönüştür - settlement_transactions şemasına uygun
+   */  transformSettlementData(apiData, storeId) {
     return apiData.map(item => ({
       store_id: storeId,
-      settlement_id: item.settlementId || item.id,
-      settlement_date: new Date(item.settlementDate || item.transactionDate),
-      order_number: item.orderNumber,
-      commission_amount: parseFloat(item.commissionAmount || item.commission || 0),
-      seller_revenue: parseFloat(item.sellerRevenue || item.sellerPrice || 0),
-      payment_date: item.paymentDate ? new Date(item.paymentDate) : null,
+      transaction_id: item.settlementId || item.id || `ST-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      transaction_date: new Date(item.settlementDate || item.transactionDate || item.orderDate || Date.now()),
       transaction_type: item.transactionType || 'Sale',
+      debt: parseFloat(item.debt || 0),
+      credit: parseFloat(item.credit || item.totalPrice || item.sellerRevenue || 0),
+      seller_revenue: parseFloat(item.sellerRevenue || item.sellerPrice || 0),
+      commission_amount: parseFloat(item.commissionAmount || item.commission || 0),
+      order_number: item.orderNumber || null,
+      seller_id: parseInt(item.sellerId || storeId),
       status: item.status || 'COMPLETED',
-      currency: item.currency || 'TRY',
       total_price: parseFloat(item.totalPrice || item.amount || 0),
+      payment_date: item.paymentDate ? new Date(item.paymentDate) : null,
       created_at: new Date(),
       updated_at: new Date()
     }));

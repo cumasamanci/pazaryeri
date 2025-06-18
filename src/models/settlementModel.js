@@ -82,9 +82,8 @@ const SettlementModel = {
         ...item,
         created_at: new Date(),
         updated_at: new Date()
-      }));
-
-      const { data, error } = await db.from(SettlementModel.tableName)
+      }));      const { data, error } = await db.getClient()
+        .from(SettlementModel.tableName)
         .insert(dataWithTimestamps)
         .select();
 

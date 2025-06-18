@@ -102,11 +102,9 @@ const AutomationJobModel = {
       // Zorunlu alan kontrolü
       if (!jobData.user_id || !jobData.store_id || !jobData.job_name || !jobData.api_type) {
         throw new Error('user_id, store_id, job_name ve api_type alanları zorunludur');
-      }
-
-      // Önce admin client dene, yoksa normal client kullan
-      const client = db.getAdminClient ? db.getAdminClient() : db.getClient();
-      console.log('Kullanılan client türü:', db.getAdminClient ? 'Admin' : 'Normal');
+      }      // Normal client kullan (service key geçersiz olduğu için)
+      const client = db.getClient();
+      console.log('Kullanılan client türü: Normal (service key placeholder)');
 
       const insertData = {
         ...jobData,
